@@ -30,6 +30,10 @@ char* event_to_str(int type) {
     return "Lock (mutex)";
   case EVENT_MUTEX_WAIT:
     return "Wait (mutex)";
+  case EVENT_MUTEX_WAKE:
+    return "Wake (mutex)";
+  case EVENT_MUTEX_NOTIFY:
+    return "Notify (mutex)";
   case EVENT_SEMAPHORE_LOCK:
     return "Lock (sem)";
   case EVENT_SEMAPHORE_WAIT:
@@ -95,6 +99,21 @@ void process_mutex_wait_event(struct event_hdr* header) {
   printf(" [%0x]\n", event->lock);
 }
 
+void process_mutex_wake_event(struct event_hdr* header) {
+  struct mutex_wake_event* event = (struct mutex_wake_event*) header;
+  fread(&event->lock, 4, 1, stdin);
+  print_event_header(header);
+  printf(" [%0x]\n", event->lock);
+}
+
+void process_mutex_notify_event(struct event_hdr* header) {
+  struct mutex_notify_event* event = (struct mutex_notify_event*) header;
+  fread(&event->lock, 4, 1, stdin);
+  fread(&event->pid, 2, 1, stdin);
+  print_event_header(header);
+  printf(" [%0x] pid: %d\n", event->lock, event->pid);
+}
+
 void process_sem_lock_event(struct event_hdr* header) {
   struct sem_lock_event* event = (struct sem_lock_event*) header;
   fread(&event->lock, 4, 1, stdin);
@@ -129,6 +148,12 @@ int main() {
       break;
     case EVENT_MUTEX_WAIT:
       process_mutex_wait_event(event);
+      break;
+    case EVENT_MUTEX_WAKE:
+      process_mutex_wake_event(event);
+      break;
+    case EVENT_MUTEX_NOTIFY:
+      process_mutex_notify_event(event);
       break;
     case EVENT_SEMAPHORE_LOCK:
       process_sem_lock_event(event);
