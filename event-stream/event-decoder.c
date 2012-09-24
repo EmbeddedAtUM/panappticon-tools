@@ -32,6 +32,10 @@ char* event_to_str(int type) {
     return "Lock (sem)";
   case EVENT_SEMAPHORE_WAIT:
     return "Wait (sem)";
+  case EVENT_IO_BLOCK:
+    return "Block (IO)";
+  case EVENT_IO_RESUME:
+    return "Resume (IO)";
   default:
     return "Unknown";
   }
@@ -126,6 +130,8 @@ int main() {
     case EVENT_STREAM_RESUME:
     case EVENT_SOCK_BLOCK:
     case EVENT_SOCK_RESUME:
+    case EVENT_IO_BLOCK:
+    case EVENT_IO_RESUME:
       process_simple_event(event);
       break;
     default:
