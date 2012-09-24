@@ -8,6 +8,8 @@
 
 char* event_to_str(int type) {
   switch (type) {
+  case EVENT_SYNC_LOG:
+    return "Sync";
   case EVENT_CONTEXT_SWITCH:
     return "Context Switch";
   case EVENT_FORK:
@@ -55,6 +57,13 @@ void print_event_header(struct event_hdr* header) {
 
 void process_simple_event(struct event_hdr* event) {
   print_event_header(event);
+  printf("\n");
+}
+
+void process_sync_log_event(struct event_hdr* header) {
+  struct sync_log_event* event = (struct sync_log_event*) header;
+  fread(&event->magic, 8, 1, stdin);
+  print_event_header(header);
   printf("\n");
 }
 
@@ -106,6 +115,9 @@ int main() {
   
   while (fread(event, sizeof(struct event_hdr), 1, stdin) && !feof(stdin)) {
     switch (event->event_type) {
+    case EVENT_SYNC_LOG:
+      process_sync_log_event(event);
+      break;
     case EVENT_CONTEXT_SWITCH:
       process_context_switch_event(event);
       break;
