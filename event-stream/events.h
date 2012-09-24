@@ -28,9 +28,9 @@
 struct event_hdr {
   __u8  event_type;
   __u8  cpu;
+  __le16 pid;
   __le32 tv_sec;
   __le32 tv_usec;
-  __le16 pid;
 }__attribute__((packed));
 
 struct context_switch_event {
@@ -63,7 +63,15 @@ struct mutex_wait_event {
   __le32 lock;
 }__attribute__((packed));
 
+struct sem_lock_event {
+  struct event_hdr hdr;
+  __le32 lock;
+}__attribute__((packed));
 
+struct sem_wait_event {
+  struct event_hdr hdr;
+  __le32 lock;
+}__attribute__((packed));
 
 #ifdef __KERNEL__
 void event_log_header_init(struct event_hdr* event, u8 type);
@@ -77,7 +85,9 @@ void event_log_sock_block(void);
 void event_log_sock_resume(void);
 void event_log_fork(pid_t pid, pid_t tgid);
 void event_log_mutex_lock(void* lock);
-void event_log_mutex_wait(void* lock);
+void event_log_mutex_wait(void* lock);;
+void event_log_sem_lock(void* lock);
+void event_log_sem_wait(void* lock);
 #endif
 
 #endif

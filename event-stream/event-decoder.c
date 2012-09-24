@@ -28,6 +28,10 @@ char* event_to_str(int type) {
     return "Lock (mutex)";
   case EVENT_MUTEX_WAIT:
     return "Wait (mutex)";
+  case EVENT_SEMAPHORE_LOCK:
+    return "Lock (sem)";
+  case EVENT_SEMAPHORE_WAIT:
+    return "Wait (sem)";
   default:
     return "Unknown";
   }
@@ -78,6 +82,20 @@ void process_mutex_wait_event(struct event_hdr* header) {
   printf(" [%0x]\n", event->lock);
 }
 
+void process_sem_lock_event(struct event_hdr* header) {
+  struct sem_lock_event* event = (struct sem_lock_event*) header;
+  fread(&event->lock, 4, 1, stdin);
+  print_event_header(header);
+  printf(" [%0x]\n", event->lock);
+}
+
+void process_sem_wait_event(struct event_hdr* header) {
+  struct sem_wait_event* event = (struct sem_wait_event*) header;
+  fread(&event->lock, 4, 1, stdin);
+  print_event_header(header);
+  printf(" [%0x]\n", event->lock);
+}
+
 int main() {
   char raw[100];
   struct event_hdr* event = (struct event_hdr*) &raw;
@@ -95,6 +113,12 @@ int main() {
       break;
     case EVENT_MUTEX_WAIT:
       process_mutex_wait_event(event);
+      break;
+    case EVENT_SEMAPHORE_LOCK:
+      process_sem_lock_event(event);
+      break;
+    case EVENT_SEMAPHORE_WAIT:
+      process_sem_wait_event(event);
       break;
     case EVENT_DATAGRAM_BLOCK:
     case EVENT_DATAGRAM_RESUME:
