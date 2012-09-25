@@ -18,6 +18,8 @@ char* event_to_str(int type) {
     return "Fork";
   case EVENT_THREAD_NAME:
     return "Thread name";
+  case EVENT_EXIT:
+    return "Exit";
   case EVENT_DATAGRAM_BLOCK:
     return "Block (datagram)";
   case EVENT_DATAGRAM_RESUME:
@@ -166,6 +168,9 @@ int main() {
       break;
     case EVENT_FORK:
       process_fork_event(event);
+      break;
+    case EVENT_EXIT:
+      process_simple_event(event);
       break;
     case EVENT_MUTEX_LOCK:
       process_mutex_lock_event(event);
