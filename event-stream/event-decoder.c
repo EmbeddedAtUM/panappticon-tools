@@ -10,6 +10,8 @@ char* event_to_str(int type) {
   switch (type) {
   case EVENT_SYNC_LOG:
     return "Sync";
+  case EVENT_MISSED_COUNT:
+    return "Missed Count";
   case EVENT_CONTEXT_SWITCH:
     return "Context Switch";
   case EVENT_FORK:
@@ -71,6 +73,13 @@ void process_sync_log_event(struct event_hdr* header) {
   fread(&event->magic, 8, 1, stdin);
   print_event_header(header);
   printf("\n");
+}
+
+void process_missed_count_event(struct event_hdr* header) {
+  struct missed_count_event* event = (struct missed_count_event*) header;
+  fread(&event->count, 4, 1, stdin);
+  print_event_header(header);
+  printf(" %d\n", event->count);
 }
 
 void process_context_switch_event(struct event_hdr* header) {
@@ -145,6 +154,9 @@ int main() {
     switch (event->event_type) {
     case EVENT_SYNC_LOG:
       process_sync_log_event(event);
+      break;
+    case EVENT_MISSED_COUNT:
+      process_missed_count_event(event);
       break;
     case EVENT_THREAD_NAME:
       process_thread_name_event(event);
