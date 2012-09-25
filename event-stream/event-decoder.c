@@ -14,6 +14,8 @@ char* event_to_str(int type) {
     return "Context Switch";
   case EVENT_FORK:
     return "Fork";
+  case EVENT_THREAD_NAME:
+    return "Thread name";
   case EVENT_DATAGRAM_BLOCK:
     return "Block (datagram)";
   case EVENT_DATAGRAM_RESUME:
@@ -85,6 +87,13 @@ void process_fork_event(struct event_hdr* header) {
   printf("pid:%d tgid:%d\n", event->pid, event->tgid);
 }						   
 
+void process_thread_name_event(struct event_hdr* header) {
+  struct thread_name_event* event = (struct thread_name_event*) header;
+  fread(&event->comm, 16, 1, stdin);
+  print_event_header(header);
+  printf("\"%s\"\n", event->comm);
+}
+
 void process_mutex_lock_event(struct event_hdr* header) {
   struct mutex_lock_event* event = (struct mutex_lock_event*) header;
   fread(&event->lock, 4, 1, stdin);
@@ -136,6 +145,9 @@ int main() {
     switch (event->event_type) {
     case EVENT_SYNC_LOG:
       process_sync_log_event(event);
+      break;
+    case EVENT_THREAD_NAME:
+      process_thread_name_event(event);
       break;
     case EVENT_CONTEXT_SWITCH:
       process_context_switch_event(event);
