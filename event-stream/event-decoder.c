@@ -14,6 +14,10 @@ char* event_to_str(int type) {
     return "Missed Count";
   case EVENT_CONTEXT_SWITCH:
     return "Context Switch";
+  case EVENT_IDLE_START:
+    return "Idle Start";
+  case EVENT_IDLE_END:
+    return "Idle End";
   case EVENT_FORK:
     return "Fork";
   case EVENT_THREAD_NAME:
@@ -190,6 +194,8 @@ int main() {
     case EVENT_SEMAPHORE_WAIT:
       process_sem_wait_event(event);
       break;
+    case EVENT_IDLE_START:
+    case EVENT_IDLE_END:
     case EVENT_DATAGRAM_BLOCK:
     case EVENT_DATAGRAM_RESUME:
     case EVENT_STREAM_BLOCK:
