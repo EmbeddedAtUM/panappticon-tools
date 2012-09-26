@@ -12,6 +12,12 @@ char* event_to_str(int type) {
     return "Sync";
   case EVENT_MISSED_COUNT:
     return "Missed Count";
+  case EVENT_CPU_ONLINE:
+    return "CPU Online";
+  case EVENT_CPU_DOWN_PREPARE:
+    return "CPU Down Prepare";
+  case EVENT_CPU_DEAD:
+    return "CPU Offline";
   case EVENT_CONTEXT_SWITCH:
     return "Context Switch";
   case EVENT_IDLE_START:
@@ -86,6 +92,13 @@ void process_missed_count_event(struct event_hdr* header) {
   fread(&event->count, 4, 1, stdin);
   print_event_header(header);
   printf(" %d\n", event->count);
+}
+
+void process_hotcpu_event(struct event_hdr* header) {
+  struct hotcpu_event* event = (struct hotcpu_event*) header;
+  fread(&event->cpu, 1, 1, stdin);
+  print_event_header(header);
+  printf(": %d\n", event->cpu);
 }
 
 void process_context_switch_event(struct event_hdr* header) {
@@ -164,6 +177,11 @@ int main() {
       break;
     case EVENT_MISSED_COUNT:
       process_missed_count_event(event);
+      break;
+    case EVENT_CPU_ONLINE:
+    case EVENT_CPU_DOWN_PREPARE:
+    case EVENT_CPU_DEAD:
+      process_hotcpu_event(event);
       break;
     case EVENT_THREAD_NAME:
       process_thread_name_event(event);
