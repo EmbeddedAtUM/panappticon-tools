@@ -104,9 +104,10 @@ void process_fork_event(struct event_hdr* header) {
 
 void process_thread_name_event(struct event_hdr* header) {
   struct thread_name_event* event = (struct thread_name_event*) header;
+  fread(&event->pid, 2, 1, stdin);
   fread(&event->comm, 16, 1, stdin);
   print_event_header(header);
-  printf("\"%s\"\n", event->comm);
+  printf("%d=>\"%s\"\n", event->pid, event->comm);
 }
 
 void process_mutex_lock_event(struct event_hdr* header) {
