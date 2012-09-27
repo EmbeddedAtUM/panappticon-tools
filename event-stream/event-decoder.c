@@ -26,6 +26,10 @@ char* event_to_str(int type) {
     return "Resume (from RAM)";
   case EVENT_RESUME_FINISH:
     return "Resume Finish (from RAM)";
+  case EVENT_WAKE_LOCK:
+    return "Wake Lock";
+  case EVENT_WAKE_UNLOCK:
+    return "Wake Unlock";
   case EVENT_CONTEXT_SWITCH:
     return "Context Switch";
   case EVENT_IDLE_START:
@@ -116,6 +120,24 @@ void process_context_switch_event(struct event_hdr* header) {
   printf("%5d => %5d\n", event->old_pid, event->new_pid);
 }
 
+void process_wake_lock_event(struct event_hdr* header) {
+  struct wake_lock_event* event = (struct wake_lock_event*) header;
+  fread(&event->lock, 4, 1, stdin);
+  fread(&event->timeout, 4, 1, stdin);
+  print_event_header(header);
+  printf("[%x]", event->lock);
+  if (event->timeout != 0)
+    printf(" (%d)", event->timeout);
+  printf("\n");
+}
+
+void process_wake_unlock_event(struct event_hdr* header) {
+  struct wake_unlock_event* event = (struct wake_unlock_event*) header;
+  fread(&event->lock, 4, 1, stdin);
+  print_event_header(header);
+  printf("[%x]\n", event->lock);
+}
+
 void process_fork_event(struct event_hdr* header) {
   struct fork_event* event = (struct fork_event*) header;
   fread(&event->pid, 4, 1, stdin);
@@ -196,6 +218,12 @@ int main() {
       break;
     case EVENT_CONTEXT_SWITCH:
       process_context_switch_event(event);
+      break;
+    case EVENT_WAKE_LOCK:
+      process_wake_lock_event(event);
+      break;
+    case EVENT_WAKE_UNLOCK:
+      process_wake_unlock_event(event);
       break;
     case EVENT_FORK:
       process_fork_event(event);
