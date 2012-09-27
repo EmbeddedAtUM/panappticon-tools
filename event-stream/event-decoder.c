@@ -32,6 +32,8 @@ char* event_to_str(int type) {
     return "Wake Unlock";
   case EVENT_CONTEXT_SWITCH:
     return "Context Switch";
+  case EVENT_PREEMPT_TICK:
+    return "Preempt Tick";
   case EVENT_IDLE_START:
     return "Idle Start";
   case EVENT_IDLE_END:
@@ -249,6 +251,7 @@ int main() {
     case EVENT_SEMAPHORE_WAIT:
       process_sem_wait_event(event);
       break;
+    case EVENT_PREEMPT_TICK:
     case EVENT_SUSPEND_START:
     case EVENT_SUSPEND:
     case EVENT_RESUME:
