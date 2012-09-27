@@ -18,6 +18,14 @@ char* event_to_str(int type) {
     return "CPU Down Prepare";
   case EVENT_CPU_DEAD:
     return "CPU Offline";
+  case EVENT_SUSPEND_START:
+    return "Suspend Start (to RAM)";
+  case EVENT_SUSPEND:
+    return "Suspend (to RAM)";
+  case EVENT_RESUME:
+    return "Resume (from RAM)";
+  case EVENT_RESUME_FINISH:
+    return "Resume Finish (from RAM)";
   case EVENT_CONTEXT_SWITCH:
     return "Context Switch";
   case EVENT_IDLE_START:
@@ -213,6 +221,10 @@ int main() {
     case EVENT_SEMAPHORE_WAIT:
       process_sem_wait_event(event);
       break;
+    case EVENT_SUSPEND_START:
+    case EVENT_SUSPEND:
+    case EVENT_RESUME:
+    case EVENT_RESUME_FINISH:
     case EVENT_IDLE_START:
     case EVENT_IDLE_END:
     case EVENT_DATAGRAM_BLOCK:
