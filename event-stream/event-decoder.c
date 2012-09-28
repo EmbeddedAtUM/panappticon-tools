@@ -6,6 +6,8 @@
 
 #include "events.h"
 
+#define PID_MASK 0x7FFF
+
 char* event_to_str(int type) {
   switch (type) {
   case EVENT_SYNC_LOG:
@@ -98,7 +100,10 @@ void print_event_header(struct event_hdr* header) {
   strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", time_tm);
   snprintf(buf, sizeof buf, "%s.%06d", tmbuf, header->tv_usec);
 
-  printf("[%s] <%d> (%5d) %s ", buf, header->cpu, header->pid, event_to_str(header->event_type));
+  if (0x8000 & header->pid)
+    printf("[%s] <%d> (I %5d) %s ", buf, header->cpu, header->pid & PID_MASK, event_to_str(header->event_type));
+  else
+    printf("[%s] <%d> (%7d) %s ", buf, header->cpu, header->pid & PID_MASK, event_to_str(header->event_type));
 }
 
 void process_simple_event(struct event_hdr* event) {
