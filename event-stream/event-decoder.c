@@ -56,6 +56,12 @@ char* event_to_str(int type) {
     return "Block (socket)";
   case EVENT_SOCK_RESUME:
     return "Resume (socket)";
+  case EVENT_WAITQUEUE_WAIT:
+    return "Wait (waitqueue)";
+  case EVENT_WAITQUEUE_WAKE:
+    return "Wake (waitqueue)";
+  case EVENT_WAITQUEUE_NOTIFY:
+    return "Notify (waitqueue)";
   case EVENT_MUTEX_LOCK:
     return "Lock (mutex)";
   case EVENT_MUTEX_WAIT:
@@ -155,6 +161,28 @@ void process_thread_name_event(struct event_hdr* header) {
   printf("%d=>\"%s\"\n", event->pid, event->comm);
 }
 
+void process_waitqueue_wait_event(struct event_hdr* header) {
+  struct waitqueue_wait_event* event = (struct waitqueue_wait_event*) header;
+  fread(&event->wq, 4, 1, stdin);
+  print_event_header(header);
+  printf(" [%0x]\n", event->wq);
+}
+
+void process_waitqueue_wake_event(struct event_hdr* header) {
+  struct waitqueue_wake_event* event = (struct waitqueue_wake_event*) header;
+  fread(&event->wq, 4, 1, stdin);
+  print_event_header(header);
+  printf(" [%0x]\n", event->wq);
+}
+
+void process_waitqueue_notify_event(struct event_hdr* header) {
+  struct waitqueue_notify_event* event = (struct waitqueue_notify_event*) header;
+  fread(&event->wq, 4, 1, stdin);
+  fread(&event->pid, 2, 1, stdin);
+  print_event_header(header);
+  printf(" [%0x] pid: %d\n", event->wq, event->pid);
+}
+
 void process_mutex_lock_event(struct event_hdr* header) {
   struct mutex_lock_event* event = (struct mutex_lock_event*) header;
   fread(&event->lock, 4, 1, stdin);
@@ -232,6 +260,15 @@ int main() {
       break;
     case EVENT_EXIT:
       process_simple_event(event);
+      break;
+    case EVENT_WAITQUEUE_WAIT:
+      process_waitqueue_wait_event(event);
+      break;
+    case EVENT_WAITQUEUE_WAKE:
+      process_waitqueue_wake_event(event);
+      break;
+    case EVENT_WAITQUEUE_NOTIFY:
+      process_waitqueue_notify_event(event);
       break;
     case EVENT_MUTEX_LOCK:
       process_mutex_lock_event(event);
