@@ -83,6 +83,8 @@ char* event_to_str(int type) {
   }
 }
 
+char* TASK_STATE[] = {"Running", "Interruptible", "Uninterruptible", "Stopped", "Traced", NULL, NULL, "Dead", "Wakekill"};
+
 void print_event_header(struct event_hdr* header) {
 
   time_t time = header->tv_sec;
@@ -123,9 +125,11 @@ void process_hotcpu_event(struct event_hdr* header) {
 
 void process_context_switch_event(struct event_hdr* header) {
   struct context_switch_event* event = (struct context_switch_event*) header;
-  fread(&event->old_pid, 4, 1, stdin);
+  fread(&event->old_pid, 2, 1, stdin);
+  fread(&event->new_pid, 2, 1, stdin);
+  fread(&event->state, 1, 1, stdin);
   print_event_header(header);
-  printf("%5d => %5d\n", event->old_pid, event->new_pid);
+  printf("%5d => %5d (%s)\n", event->old_pid, event->new_pid, TASK_STATE[event->state ? __builtin_ctz(event->state)+1 : 0]);
 }
 
 void process_wake_lock_event(struct event_hdr* header) {
