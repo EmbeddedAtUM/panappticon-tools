@@ -34,6 +34,8 @@ char* event_to_str(int type) {
     return "Context Switch";
   case EVENT_PREEMPT_TICK:
     return "Preempt Tick";
+  case EVENT_PREEMPT_WAKEUP:
+    return "Preempt Wakeup";
   case EVENT_YIELD:
     return "Yield";
   case EVENT_IDLE_START:
@@ -295,6 +297,7 @@ int main() {
       process_sem_wait_event(event);
       break;
     case EVENT_PREEMPT_TICK:
+    case EVENT_PREEMPT_WAKEUP:
     case EVENT_YIELD:
     case EVENT_SUSPEND_START:
     case EVENT_SUSPEND:
