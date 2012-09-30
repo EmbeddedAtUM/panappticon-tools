@@ -56,192 +56,276 @@
 #define EVENT_RESUME 77
 #define EVENT_RESUME_FINISH 78
 
+#define MAX8 ((1 << 7) - 1)
+#define MIN8 (-(1 << 7))
+
+#define MAX16 ((1 << 15) - 1)
+#define MIN16 (-(1 << 15))
+
+#define MAX24 ((1 << 23) - 1)
+#define MIN24 (-(1 << 23))
+
 struct event_hdr {
-  __u8  event_type;
-  __u8  cpu;
+  __u8 event_type;
+  __u8 cpu_tvlen;
   __le16 pid;
-  __le32 tv_sec;
-  __le32 tv_usec;
 }__attribute__((packed));
 
+#define CPU_MASK = 0xF0
+#define TVLEN_MASK = 0x0F
+
+#define SET_CPU(header, val) header->cpu_tvlen = (header->cpu_tvlen & ~(0xF0)) | ((val) << 4)
+#define GET_CPU(header) ((header->cpu_tvlen & 0xF0) >> 4)
+
+#define SET_TVLEN(header, sec, usec) do {				\
+    if ((sec) == 4)							\
+      header->cpu_tvlen = (header->cpu_tvlen & ~(0x0F)) | ((usec) << 2); \
+    else								\
+      header->cpu_tvlen = (header->cpu_tvlen & ~(0x0F)) | ((sec) << 2) | (usec); \
+  } while(0)
+
+#define GET_SEC_LEN(header) ({				\
+      int __ret;					\
+      if (0 == (header->cpu_tvlen & 0x03))		\
+	__ret = 4;					\
+      else						\
+	__ret = (header->cpu_tvlen & 0x0C) >> 2;	\
+      __ret;						\
+    })
+
+#define GET_USEC_LEN(header) ({			\
+  int __ret = (header->cpu_tvlen & 0x03);	\
+  if (0 == __ret)				\
+    __ret = (header->cpu_tvlen & 0x0C) >> 2;	\
+  __ret;					\
+})
+
 struct sync_log_event {
-  struct event_hdr hdr;
   char magic[8];
 }__attribute__((packed));
 
 struct missed_count_event {
-  struct event_hdr hdr;
   __le32 count;
 }__attribute__((packed));
 
 struct context_switch_event {
-  struct event_hdr hdr;
   __le16 old_pid;
   __le16 new_pid;
-  __u8   state;
-  
+  __u8   state;  
 }__attribute__((packed));
 
 struct preempt_tick_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct preempt_wakeup_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct yield_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct hotcpu_event {
-  struct event_hdr hdr;
   __u8 cpu;
 }__attribute__((packed));
 
 struct wake_lock_event {
-  struct event_hdr hdr;
   __le32 lock;
   __le32 timeout;
 }__attribute__((packed));
 
 struct wake_unlock_event {
-  struct event_hdr hdr;
   __le32 lock;
 }__attribute__((packed));
 
 struct suspend_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct idle_start_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct idle_end_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct fork_event {
-  struct event_hdr hdr;
   __le16 pid;
   __le16 tgid;
 }__attribute__((packed));
 
 struct exit_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct thread_name_event {
-  struct event_hdr hdr;
   __u16 pid;
   char comm[16];
 }__attribute__((packed));
 
 struct network_block_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct network_resume_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct waitqueue_wait_event {
-  struct event_hdr hdr;
   __le32 wq;
 }__attribute__((packed));
 
 struct waitqueue_wake_event {
-  struct event_hdr hdr;
   __le32 wq;
 }__attribute__((packed));
 
 struct waitqueue_notify_event {
-  struct event_hdr hdr;
   __le32 wq;
   __le16 pid;
 }__attribute__((packed));
 
 struct mutex_lock_event {
-  struct event_hdr hdr;
   __le32 lock;
 }__attribute__((packed));
 
 struct mutex_wait_event {
-  struct event_hdr hdr;
   __le32 lock;
 }__attribute__((packed));
 
 struct mutex_wake_event {
-  struct event_hdr hdr;
   __le32 lock;
 }__attribute__((packed));
 
 struct mutex_notify_event {
-  struct event_hdr hdr;
   __le32 lock;
   __le16 pid;
 }__attribute__((packed));
 
 struct sem_lock_event {
-  struct event_hdr hdr;
   __le32 lock;
 }__attribute__((packed));
 
 struct sem_wait_event {
-  struct event_hdr hdr;
   __le32 lock;
 }__attribute__((packed));
 
 struct io_block_event {
-  struct event_hdr hdr;
 }__attribute__((packed));
 
 struct io_resume_event {
-  struct event_hdr hdr;
+}__attribute__((packed));
+
+struct simple_event {
 }__attribute__((packed));
 
 #ifdef __KERNEL__
 
+#include <linux/hardirq.h>
 #include <linux/time.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
 
 #ifdef CONFIG_EVENT_LOGGING
-extern void log_event(void* data, int len);
+extern void* reserve_event(int len);
+extern void shrink_event(int len);
+extern struct timeval* get_timestamp(void);
 
-static inline void event_log_header_init(struct event_hdr* event, u8 type) {
-  struct timeval tv;
-  do_gettimeofday(&tv);
+#define __init_event(type, event_type, name, diff)			\
+  struct timeval tv;							\
+  u8 sec_len;								\
+  u8 usec_len;								\
+  struct event_hdr* header;						\
+  char* sec;								\
+  char* usec;								\
+  type* name;								\
+  unsigned long flags;							\
+  local_irq_save(flags);						\
+  header = (typeof(header)) reserve_event(sizeof(*header) + 4 + 3 + sizeof(*name)); \
+  if (header) {								\
+  tv = event_log_timestamp(diff);					\
+  if (diff) {								\
+    sec_len = vsize_sec(tv.tv_sec);					\
+    usec_len = vsize_usec(tv.tv_usec);					\
+  } else {								\
+    sec_len = 4;							\
+    usec_len = 3;							\
+  }									\
+  shrink_event(4 + 3 - sec_len - usec_len);				\
+  sec = (char*) (header+1);						\
+  usec = sec + sec_len;							\
+  name = (typeof(name)) (usec + usec_len);				\
+  memcpy(sec, &tv.tv_sec, sec_len);					\
+  memcpy(usec, &tv.tv_usec, usec_len);					\
+  event_log_header_init(header, sec_len, usec_len, event_type)
 
+#define init_event(type, event_type, name) __init_event(type, event_type, name, 1)
+
+#define finish_event() } \
+    local_irq_restore(flags)
+
+/* Records the current timestamp and, if diff is true, returns the
+ * time passed since the last timestamp. Otherwise, the recorded current
+ * time is returned.  static inline struct timeval */
+static inline struct timeval event_log_timestamp(int diff) {
+  struct timeval *cur = get_timestamp();
+  struct timeval prev = *cur;
+  do_gettimeofday(cur);
+  if (!diff) 
+    return *cur;
+  prev.tv_sec = cur->tv_sec - prev.tv_sec;
+  prev.tv_usec = cur->tv_usec - prev.tv_usec;
+  return prev;
+}
+
+static inline u8 vsize_usec(long val) {
+  if ((MIN8 <= val) && (val <= MAX8))
+    return 1;
+  else if ((MIN16 <= val) && (val <= MAX16))
+    return 2;
+  else
+    return 3;
+}
+
+static inline u8 vsize_sec(long val) {
+  if (val == 0)
+    return 0;
+  else if ((MIN8 <= val) && (val <= MAX8))
+    return 1;
+  else if ((MIN16 <= val) && (val <= MAX16))
+    return 2;
+  else if ((MIN24 <= val) && (val <= MAX24))
+    return 3;
+  else
+    return 4;
+}
+
+static inline void event_log_header_init(struct event_hdr* event, u8 sec_len, u8 usec_len, u8 type) {
   event->event_type = type;
-  event->tv_sec = tv.tv_sec;
-  event->tv_usec = tv.tv_usec;
-  event->cpu = smp_processor_id();
-  event->pid = current->pid;
+  SET_CPU(event, smp_processor_id());
+  SET_TVLEN(event, sec_len, usec_len);
+  event->pid = current->pid | (in_interrupt() ? 0x8000 : 0);
 }
 
 static inline void event_log_simple(u8 event_type) {
-  unsigned long flags;
-  struct event_hdr event;
-  local_irq_save(flags);
-  event_log_header_init(&event, event_type);
-  log_event(&event, sizeof(struct event_hdr));
-  local_irq_restore(flags);
+  init_event(struct simple_event, event_type, event);
+  finish_event();
 }
+
+static inline void event_log_sync(void) {
+  __init_event(struct sync_log_event, EVENT_SYNC_LOG, event, 0);
+  memcpy(&event->magic, EVENT_LOG_MAGIC, 8);
+  finish_event();
+}
+
+static inline void event_log_missed_count(int* count) {
+  init_event(struct missed_count_event, EVENT_MISSED_COUNT, event);
+  event->count = *count;
+  *count = 0;
+  finish_event();
+}
+
 #endif
 
 static inline void event_log_context_switch(pid_t old, pid_t new, long state) {
 #ifdef CONFIG_EVENT_CONTEXT_SWITCH
-  unsigned long flags;
-  struct context_switch_event event;
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_CONTEXT_SWITCH);
-  event.old_pid = old;
-  event.new_pid = new;
-  event.state = (__u8) (0x0FF & state);
-  log_event(&event, sizeof(struct context_switch_event));
-  local_irq_restore(flags);
+  init_event(struct context_switch_event, EVENT_CONTEXT_SWITCH, event);
+  event->old_pid = old;
+  event->new_pid = new;
+  event->state = (__u8) (0x0FF & state);
+  finish_event();
 #endif
 }
 
@@ -265,13 +349,9 @@ static inline void event_log_yield(void) {
 
 #if defined(CONFIG_EVENT_CPU_ONLINE) || defined(CONFIG_EVENT_CPU_DEAD) || defined(CONFIG_EVENT_CPU_DOWN_PREPARE)
 static inline void event_log_hotcpu(unsigned int cpu, u8 event_type) {
-  unsigned long flags;
-  struct hotcpu_event event;
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, event_type);
-  event.cpu = cpu;
-  log_event(&event, sizeof(struct hotcpu_event));
-  local_irq_restore(flags);
+  init_event(struct hotcpu_event, EVENT_CPU_ONLINE, event);
+  event->cpu = cpu;
+  finish_event();
 }
 #endif
 
@@ -379,40 +459,27 @@ static inline void event_log_io_resume(void) {
 
 static inline void event_log_wake_lock(void* lock, long timeout) {
 #ifdef CONFIG_EVENT_WAKE_LOCK
-  unsigned long flags;
-  struct wake_lock_event event;
-  
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_WAKE_LOCK);
-  event.lock = (__le32) lock;
-  event.timeout = timeout;
-  log_event(&event, sizeof(struct wake_lock_event));
-  local_irq_restore(flags);
+  init_event(struct wake_lock_event, EVENT_WAKE_LOCK, event);
+  event->lock = (__le32) lock;
+  event->timeout = timeout;
+  finish_event();
 #endif
 }
 
 static inline void event_log_wake_unlock(void* lock) {
-  unsigned long flags;
-  struct wake_unlock_event event;
-  
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_WAKE_UNLOCK);
-  event.lock = (__le32) lock;
-  log_event(&event, sizeof(struct wake_unlock_event));
-  local_irq_restore(flags);
+#ifdef CONFIG_EVENT_WAKE_UNLOCK
+  init_event(struct wake_unlock_event, EVENT_WAKE_UNLOCK, event);
+  event->lock = (__le32) lock;
+  finish_event();
+#endif
 }
 
 static inline void event_log_fork(pid_t pid, pid_t tgid) {
 #ifdef CONFIG_EVENT_FORK
-  unsigned long flags;
-  struct fork_event event;
-  
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_FORK);
-  event.pid = pid;
-  event.tgid = tgid;
-  log_event(&event, sizeof(struct fork_event));
-  local_irq_restore(flags);
+  init_event(struct fork_event, EVENT_FORK, event);
+  event->pid = pid;
+  event->tgid = tgid;
+  finish_event();
 #endif
 }
 
@@ -424,15 +491,10 @@ static inline void event_log_exit(void) {
 
 static inline void event_log_thread_name(struct task_struct* task) {
 #ifdef CONFIG_EVENT_THREAD_NAME
-   unsigned long flags;
-   struct thread_name_event event;
-  
-   local_irq_save(flags);
-   event_log_header_init(&event.hdr, EVENT_THREAD_NAME);
-   event.pid = task->pid;
-   memcpy(event.comm, task->comm, min(16, TASK_COMM_LEN));
-   log_event(&event, sizeof(struct thread_name_event));
-   local_irq_restore(flags);
+  init_event(struct thread_name_event, EVENT_THREAD_NAME, event);
+  event->pid = task->pid;
+  memcpy(event->comm, task->comm, min(16, TASK_COMM_LEN));
+  finish_event(); 
 #endif
 }
 
@@ -448,80 +510,50 @@ void event_log_waitqueue_notify(void* wq, pid_t pid);
 
 static inline void event_log_mutex_lock(void* lock) {
 #ifdef CONFIG_EVENT_MUTEX_LOCK
-  unsigned long flags;
-  struct mutex_lock_event event;
-
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_MUTEX_LOCK);
-  event.lock = (__le32) lock;
-  log_event(&event, sizeof(struct mutex_lock_event));
-  local_irq_restore(flags);
+  init_event(struct mutex_lock_event, EVENT_MUTEX_LOCK, event);
+  event->lock = (__le32) lock;
+  finish_event();
 #endif
 }
 
 static inline void event_log_mutex_wait(void* lock) {
 #ifdef CONFIG_EVENT_MUTEX_WAIT
-  unsigned long flags;
-  struct mutex_wait_event event;
-
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_MUTEX_WAIT);
-  event.lock = (__le32) lock;
-  log_event(&event, sizeof(struct mutex_wait_event));
-  local_irq_restore(flags);
+  init_event(struct mutex_wait_event, EVENT_MUTEX_WAIT, event);
+  event->lock = (__le32) lock;
+  finish_event();
 #endif
 }
 
 static inline void event_log_mutex_wake(void* lock) {
 #ifdef CONFIG_EVENT_MUTEX_WAKE
-  unsigned long flags;
-  struct mutex_wake_event event;
-  
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_MUTEX_WAKE);
-  event.lock = (__le32) lock;
-  log_event(&event, sizeof(struct mutex_wake_event));
-  local_irq_restore(flags);
+  init_event(struct mutex_wake_event, EVENT_MUTEX_WAKE, event);
+  event->lock = (__le32) lock;
+  finish_event();
 #endif
 }
 
 static inline void event_log_mutex_notify(void* lock, pid_t pid) {
-#ifdef CONFIG_EVENT_MUTEX_WAKE
-  unsigned long flags;
-  struct mutex_notify_event event;
-  
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_MUTEX_NOTIFY);
-  event.lock = (__le32) lock;
-  event.pid = pid;
-  log_event(&event, sizeof(struct mutex_notify_event));
-  local_irq_restore(flags);
+#ifdef CONFIG_EVENT_MUTEX_NOTIFY
+  init_event(struct mutex_notify_event, EVENT_MUTEX_NOTIFY, event);
+  event->lock = (__le32) lock;
+  event->pid = pid;
+  finish_event();
 #endif
 }
 
 static inline void event_log_sem_lock(void* lock) {
 #ifdef CONFIG_EVENT_SEMAPHORE_LOCK
-  unsigned long flags;
-  struct sem_lock_event event;
-
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_SEMAPHORE_LOCK);
-  event.lock = (__le32) lock;
-  log_event(&event, sizeof(struct sem_lock_event));
-  local_irq_restore(flags);
+  init_event(struct sem_lock_event, EVENT_SEMAPHORE_LOCK, event);
+  event->lock = (__le32) lock;
+  finish_event();
 #endif
 }
 
 static inline void event_log_sem_wait(void* lock) {
 #ifdef CONFIG_EVENT_SEMAPHORE_WAIT
-  unsigned long flags;
-  struct sem_wait_event event;
-
-  local_irq_save(flags);
-  event_log_header_init(&event.hdr, EVENT_SEMAPHORE_WAIT);
-  event.lock = (__le32) lock;
-  log_event(&event, sizeof(struct sem_wait_event));
-  local_irq_restore(flags);
+  init_event(struct sem_wait_event, EVENT_SEMAPHORE_WAIT, event);
+  event->lock = (__le32) lock;
+  finish_event();
 #endif
 }
 

@@ -91,215 +91,238 @@ char* event_to_str(int type) {
 
 char* TASK_STATE[] = {"Running", "Interruptible", "Uninterruptible", "Stopped", "Traced", NULL, NULL, "Dead", "Wakekill"};
 
-void print_event_header(struct event_hdr* header) {
+static inline size_t read_next_header(struct event_hdr* header, FILE* stream) {
+  return fread(header, sizeof(*header), 1, stream);
+}
 
-  time_t time = header->tv_sec;
+// From http://graphics.stanford.edu/~seander/bithacks.html#FixedSignExtend
+#define SIGN_EXT(val, b) ((val ^ (1 << (b-1))) - (1 << (b-1)))
+
+/* Only works on little endian arch */
+static inline void read_next_timestamp(struct timeval* tv, struct event_hdr* header, FILE* stream) {
+  static struct timeval prev;
+
+  int sec_len;
+  int usec_len;
+  tv->tv_sec = 0;
+  tv->tv_usec = 0;
+
+  sec_len = GET_SEC_LEN(header);
+  usec_len = GET_USEC_LEN(header);
+
+  fread(&tv->tv_sec, 1, sec_len, stream);
+  fread(&tv->tv_usec, 1, usec_len, stream);
+
+  tv->tv_sec = SIGN_EXT(tv->tv_sec, sec_len*8);
+  tv->tv_usec = SIGN_EXT(tv->tv_usec, usec_len*8);
+
+  if (header->event_type == EVENT_SYNC_LOG) {
+    prev = *tv;
+  }
+  else {
+    prev.tv_sec += tv->tv_sec;
+    prev.tv_usec += tv->tv_usec;
+    *tv = prev;
+  }
+
+}
+
+void print_event_common(struct event_hdr* header, struct timeval* tv) {
+  time_t time = tv->tv_sec;
   struct tm *time_tm = localtime(&time);
 
   char tmbuf[64], buf[64];
   strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", time_tm);
-  snprintf(buf, sizeof buf, "%s.%06d", tmbuf, header->tv_usec);
+  snprintf(buf, sizeof buf, "%s.%06d", tmbuf, tv->tv_usec);
 
   if (0x8000 & header->pid)
-    printf("[%s] <%d> (I %5d) %s ", buf, header->cpu, header->pid & PID_MASK, event_to_str(header->event_type));
+    printf("[%s] <%d> (I %5d) %s ", buf, GET_CPU(header), header->pid & PID_MASK, event_to_str(header->event_type));
   else
-    printf("[%s] <%d> (%7d) %s ", buf, header->cpu, header->pid & PID_MASK, event_to_str(header->event_type));
+    printf("[%s] <%d> (%7d) %s ", buf, GET_CPU(header), header->pid & PID_MASK, event_to_str(header->event_type));
 }
 
-void process_simple_event(struct event_hdr* event) {
-  print_event_header(event);
+void process_simple_event(FILE* stream) {
   printf("\n");
 }
 
-void process_sync_log_event(struct event_hdr* header) {
-  struct sync_log_event* event = (struct sync_log_event*) header;
-  fread(&event->magic, 8, 1, stdin);
-  print_event_header(header);
+void process_sync_log_event(FILE* stream) {
+  struct sync_log_event event;
+  fread(&event.magic, 8, 1, stream);
+  printf(" %8s\n", event.magic);
+}
+
+void process_missed_count_event(FILE* stream) {
+  struct missed_count_event event;
+  fread(&event.count, 4, 1, stdin);
+  printf(" %d\n", event.count);
+}
+
+void process_hotcpu_event(FILE* stream) {
+  struct hotcpu_event event;
+  fread(&event.cpu, 1, 1, stdin);
+  printf(": %d\n", event.cpu);
+}
+
+void process_context_switch_event(FILE* stream) {
+  struct context_switch_event event;
+  fread(&event.old_pid, 2, 1, stdin);
+  fread(&event.new_pid, 2, 1, stdin);
+  fread(&event.state, 1, 1, stdin);
+  printf("%5d => %5d (%s)\n", event.old_pid, event.new_pid, TASK_STATE[event.state ? __builtin_ctz(event.state)+1 : 0]);
+}
+
+void process_wake_lock_event(FILE* stream) {
+  struct wake_lock_event event;
+  fread(&event.lock, 4, 1, stdin);
+  fread(&event.timeout, 4, 1, stdin);
+  printf("[%x]", event.lock);
+  if (event.timeout != 0)
+    printf(" (%d)", event.timeout);
   printf("\n");
 }
 
-void process_missed_count_event(struct event_hdr* header) {
-  struct missed_count_event* event = (struct missed_count_event*) header;
-  fread(&event->count, 4, 1, stdin);
-  print_event_header(header);
-  printf(" %d\n", event->count);
+void process_wake_unlock_event(FILE* stream) {
+  struct wake_unlock_event event;
+  fread(&event.lock, 4, 1, stdin);
+  printf("[%x]\n", event.lock);
 }
 
-void process_hotcpu_event(struct event_hdr* header) {
-  struct hotcpu_event* event = (struct hotcpu_event*) header;
-  fread(&event->cpu, 1, 1, stdin);
-  print_event_header(header);
-  printf(": %d\n", event->cpu);
-}
-
-void process_context_switch_event(struct event_hdr* header) {
-  struct context_switch_event* event = (struct context_switch_event*) header;
-  fread(&event->old_pid, 2, 1, stdin);
-  fread(&event->new_pid, 2, 1, stdin);
-  fread(&event->state, 1, 1, stdin);
-  print_event_header(header);
-  printf("%5d => %5d (%s)\n", event->old_pid, event->new_pid, TASK_STATE[event->state ? __builtin_ctz(event->state)+1 : 0]);
-}
-
-void process_wake_lock_event(struct event_hdr* header) {
-  struct wake_lock_event* event = (struct wake_lock_event*) header;
-  fread(&event->lock, 4, 1, stdin);
-  fread(&event->timeout, 4, 1, stdin);
-  print_event_header(header);
-  printf("[%x]", event->lock);
-  if (event->timeout != 0)
-    printf(" (%d)", event->timeout);
-  printf("\n");
-}
-
-void process_wake_unlock_event(struct event_hdr* header) {
-  struct wake_unlock_event* event = (struct wake_unlock_event*) header;
-  fread(&event->lock, 4, 1, stdin);
-  print_event_header(header);
-  printf("[%x]\n", event->lock);
-}
-
-void process_fork_event(struct event_hdr* header) {
-  struct fork_event* event = (struct fork_event*) header;
-  fread(&event->pid, 4, 1, stdin);
-  print_event_header(header);
-  printf("pid:%d tgid:%d\n", event->pid, event->tgid);
+void process_fork_event(FILE* stream) {
+  struct fork_event event;
+  fread(&event.pid, 4, 1, stdin);
+  printf("pid:%d tgid:%d\n", event.pid, event.tgid);
 }						   
 
-void process_thread_name_event(struct event_hdr* header) {
-  struct thread_name_event* event = (struct thread_name_event*) header;
-  fread(&event->pid, 2, 1, stdin);
-  fread(&event->comm, 16, 1, stdin);
-  print_event_header(header);
-  printf("%d=>\"%s\"\n", event->pid, event->comm);
+void process_thread_name_event(FILE* stream) {
+  struct thread_name_event event;
+  fread(&event.pid, 2, 1, stdin);
+  fread(&event.comm, 16, 1, stdin);
+  printf("%d=>\"%s\"\n", event.pid, event.comm);
 }
 
-void process_waitqueue_wait_event(struct event_hdr* header) {
-  struct waitqueue_wait_event* event = (struct waitqueue_wait_event*) header;
-  fread(&event->wq, 4, 1, stdin);
-  print_event_header(header);
-  printf(" [%0x]\n", event->wq);
+void process_waitqueue_wait_event(FILE* stream) {
+  struct waitqueue_wait_event event;
+  fread(&event.wq, 4, 1, stdin);
+  printf(" [%0x]\n", event.wq);
 }
 
-void process_waitqueue_wake_event(struct event_hdr* header) {
-  struct waitqueue_wake_event* event = (struct waitqueue_wake_event*) header;
-  fread(&event->wq, 4, 1, stdin);
-  print_event_header(header);
-  printf(" [%0x]\n", event->wq);
+void process_waitqueue_wake_event(FILE* stream) {
+  struct waitqueue_wake_event event;
+  fread(&event.wq, 4, 1, stdin);
+  printf(" [%0x]\n", event.wq);
 }
 
-void process_waitqueue_notify_event(struct event_hdr* header) {
-  struct waitqueue_notify_event* event = (struct waitqueue_notify_event*) header;
-  fread(&event->wq, 4, 1, stdin);
-  fread(&event->pid, 2, 1, stdin);
-  print_event_header(header);
-  printf(" [%0x] pid: %d\n", event->wq, event->pid);
+void process_waitqueue_notify_event(FILE* stream) {
+  struct waitqueue_notify_event event;
+  fread(&event.wq, 4, 1, stdin);
+  fread(&event.pid, 2, 1, stdin);
+  printf(" [%0x] pid: %d\n", event.wq, event.pid);
 }
 
-void process_mutex_lock_event(struct event_hdr* header) {
-  struct mutex_lock_event* event = (struct mutex_lock_event*) header;
-  fread(&event->lock, 4, 1, stdin);
-  print_event_header(header);
-  printf(" [%0x]\n", event->lock);
+void process_mutex_lock_event(FILE* stream) {
+  struct mutex_lock_event event;
+  fread(&event.lock, 4, 1, stdin);
+  printf(" [%0x]\n", event.lock);
 }
 
-void process_mutex_wait_event(struct event_hdr* header) {
-  struct mutex_wait_event* event = (struct mutex_wait_event*) header;
-  fread(&event->lock, 4, 1, stdin);
-  print_event_header(header);
-  printf(" [%0x]\n", event->lock);
+void process_mutex_wait_event(FILE* stream) {
+  struct mutex_wait_event event;
+  fread(&event.lock, 4, 1, stdin);
+  printf(" [%0x]\n", event.lock);
 }
 
-void process_mutex_wake_event(struct event_hdr* header) {
-  struct mutex_wake_event* event = (struct mutex_wake_event*) header;
-  fread(&event->lock, 4, 1, stdin);
-  print_event_header(header);
-  printf(" [%0x]\n", event->lock);
+void process_mutex_wake_event(FILE* stream) {
+  struct mutex_wake_event event;
+  fread(&event.lock, 4, 1, stdin);
+  printf(" [%0x]\n", event.lock);
 }
 
-void process_mutex_notify_event(struct event_hdr* header) {
-  struct mutex_notify_event* event = (struct mutex_notify_event*) header;
-  fread(&event->lock, 4, 1, stdin);
-  fread(&event->pid, 2, 1, stdin);
-  print_event_header(header);
-  printf(" [%0x] pid: %d\n", event->lock, event->pid);
+void process_mutex_notify_event(FILE* stream) {
+  struct mutex_notify_event event;
+  fread(&event.lock, 4, 1, stdin);
+  fread(&event.pid, 2, 1, stdin);
+  printf(" [%0x] pid: %d\n", event.lock, event.pid);
 }
 
-void process_sem_lock_event(struct event_hdr* header) {
-  struct sem_lock_event* event = (struct sem_lock_event*) header;
-  fread(&event->lock, 4, 1, stdin);
-  print_event_header(header);
-  printf(" [%0x]\n", event->lock);
+void process_sem_lock_event(FILE* stream) {
+  struct sem_lock_event event;
+  fread(&event.lock, 4, 1, stdin);
+  printf(" [%0x]\n", event.lock);
 }
 
-void process_sem_wait_event(struct event_hdr* header) {
-  struct sem_wait_event* event = (struct sem_wait_event*) header;
-  fread(&event->lock, 4, 1, stdin);
-  print_event_header(header);
-  printf(" [%0x]\n", event->lock);
+void process_sem_wait_event(FILE* stream) {
+  struct sem_wait_event event;
+  fread(&event.lock, 4, 1, stdin);
+  printf(" [%0x]\n", event.lock);
 }
 
 int main() {
-  char raw[100];
-  struct event_hdr* event = (struct event_hdr*) &raw;
-  
-  while (fread(event, sizeof(struct event_hdr), 1, stdin) && !feof(stdin)) {
-    switch (event->event_type) {
+  struct event_hdr header;
+  struct timeval timestamp;
+
+  FILE* stream = stdin;
+
+  while (read_next_header(&header, stream) && !feof(stream)) {
+    read_next_timestamp(&timestamp, &header, stdin);
+
+    print_event_common(&header, &timestamp);
+    
+    switch (header.event_type) {
     case EVENT_SYNC_LOG:
-      process_sync_log_event(event);
+      process_sync_log_event(stream);
       break;
     case EVENT_MISSED_COUNT:
-      process_missed_count_event(event);
+      process_missed_count_event(stream);
       break;
     case EVENT_CPU_ONLINE:
     case EVENT_CPU_DOWN_PREPARE:
     case EVENT_CPU_DEAD:
-      process_hotcpu_event(event);
+      process_hotcpu_event(stream);
       break;
     case EVENT_THREAD_NAME:
-      process_thread_name_event(event);
+      process_thread_name_event(stream);
       break;
     case EVENT_CONTEXT_SWITCH:
-      process_context_switch_event(event);
+      process_context_switch_event(stream);
       break;
     case EVENT_WAKE_LOCK:
-      process_wake_lock_event(event);
+      process_wake_lock_event(stream);
       break;
     case EVENT_WAKE_UNLOCK:
-      process_wake_unlock_event(event);
+      process_wake_unlock_event(stream);
       break;
     case EVENT_FORK:
-      process_fork_event(event);
+      process_fork_event(stream);
       break;
     case EVENT_EXIT:
-      process_simple_event(event);
+      process_simple_event(stream);
       break;
     case EVENT_WAITQUEUE_WAIT:
-      process_waitqueue_wait_event(event);
+      process_waitqueue_wait_event(stream);
       break;
     case EVENT_WAITQUEUE_WAKE:
-      process_waitqueue_wake_event(event);
+      process_waitqueue_wake_event(stream);
       break;
     case EVENT_WAITQUEUE_NOTIFY:
-      process_waitqueue_notify_event(event);
+      process_waitqueue_notify_event(stream);
       break;
     case EVENT_MUTEX_LOCK:
-      process_mutex_lock_event(event);
+      process_mutex_lock_event(stream);
       break;
     case EVENT_MUTEX_WAIT:
-      process_mutex_wait_event(event);
+      process_mutex_wait_event(stream);
       break;
     case EVENT_MUTEX_WAKE:
-      process_mutex_wake_event(event);
+      process_mutex_wake_event(stream);
       break;
     case EVENT_MUTEX_NOTIFY:
-      process_mutex_notify_event(event);
+      process_mutex_notify_event(stream);
       break;
     case EVENT_SEMAPHORE_LOCK:
-      process_sem_lock_event(event);
+      process_sem_lock_event(stream);
       break;
     case EVENT_SEMAPHORE_WAIT:
-      process_sem_wait_event(event);
+      process_sem_wait_event(stream);
       break;
     case EVENT_PREEMPT_TICK:
     case EVENT_PREEMPT_WAKEUP:
@@ -318,10 +341,11 @@ int main() {
     case EVENT_SOCK_RESUME:
     case EVENT_IO_BLOCK:
     case EVENT_IO_RESUME:
-      process_simple_event(event);
+      process_simple_event(stream);
       break;
     default:
-      printf("Unknown event type received: %d\n", event->event_type);
+      printf("Unknown event type received: %d\n", header.event_type);
     }
   }
-}
+
+ }
