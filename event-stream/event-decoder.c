@@ -163,12 +163,11 @@ void process_hotcpu_event(FILE* stream) {
   printf(": %d\n", event.cpu);
 }
 
-void process_context_switch_event(FILE* stream) {
+void process_context_switch_event(struct event_hdr * header, FILE* stream) {
   struct context_switch_event event;
-  fread(&event.old_pid, 2, 1, stdin);
   fread(&event.new_pid, 2, 1, stdin);
   fread(&event.state, 1, 1, stdin);
-  printf("%5d => %5d (%s)\n", event.old_pid, event.new_pid, TASK_STATE[event.state ? __builtin_ctz(event.state)+1 : 0]);
+  printf("%5d => %5d (%s)\n", header->pid, event.new_pid, TASK_STATE[event.state ? __builtin_ctz(event.state)+1 : 0]);
 }
 
 void process_wake_lock_event(FILE* stream) {
@@ -283,7 +282,7 @@ int main() {
       process_thread_name_event(stream);
       break;
     case EVENT_CONTEXT_SWITCH:
-      process_context_switch_event(stream);
+      process_context_switch_event(&header, stream);
       break;
     case EVENT_WAKE_LOCK:
       process_wake_lock_event(stream);
