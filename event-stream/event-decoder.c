@@ -145,6 +145,19 @@ void process_simple_event(FILE* stream) {
   printf("\n");
 }
 
+void process_general_lock_event(FILE* stream) {
+  struct general_lock_event event;
+  fread(&event.lock, 4, 1, stream);
+  printf(" [%0x]\n", event.lock);
+}
+
+void process_general_notify_event(FILE* stream) {
+  struct general_notify_event event;
+  fread(&event.lock, 4, 1, stream);
+  fread(&event.pid, 2, 1, stream);
+  printf(" [%0x] pid: %d\n", event.lock, event.pid);
+}
+
 void process_sync_log_event(FILE* stream) {
   struct sync_log_event event;
   fread(&event.magic, 8, 1, stream);
@@ -199,62 +212,6 @@ void process_thread_name_event(FILE* stream) {
   printf("%d=>\"%s\"\n", event.pid, event.comm);
 }
 
-void process_waitqueue_wait_event(FILE* stream) {
-  struct waitqueue_wait_event event;
-  fread(&event.wq, 4, 1, stdin);
-  printf(" [%0x]\n", event.wq);
-}
-
-void process_waitqueue_wake_event(FILE* stream) {
-  struct waitqueue_wake_event event;
-  fread(&event.wq, 4, 1, stdin);
-  printf(" [%0x]\n", event.wq);
-}
-
-void process_waitqueue_notify_event(FILE* stream) {
-  struct waitqueue_notify_event event;
-  fread(&event.wq, 4, 1, stdin);
-  fread(&event.pid, 2, 1, stdin);
-  printf(" [%0x] pid: %d\n", event.wq, event.pid);
-}
-
-void process_mutex_lock_event(FILE* stream) {
-  struct mutex_lock_event event;
-  fread(&event.lock, 4, 1, stdin);
-  printf(" [%0x]\n", event.lock);
-}
-
-void process_mutex_wait_event(FILE* stream) {
-  struct mutex_wait_event event;
-  fread(&event.lock, 4, 1, stdin);
-  printf(" [%0x]\n", event.lock);
-}
-
-void process_mutex_wake_event(FILE* stream) {
-  struct mutex_wake_event event;
-  fread(&event.lock, 4, 1, stdin);
-  printf(" [%0x]\n", event.lock);
-}
-
-void process_mutex_notify_event(FILE* stream) {
-  struct mutex_notify_event event;
-  fread(&event.lock, 4, 1, stdin);
-  fread(&event.pid, 2, 1, stdin);
-  printf(" [%0x] pid: %d\n", event.lock, event.pid);
-}
-
-void process_sem_lock_event(FILE* stream) {
-  struct sem_lock_event event;
-  fread(&event.lock, 4, 1, stdin);
-  printf(" [%0x]\n", event.lock);
-}
-
-void process_sem_wait_event(FILE* stream) {
-  struct sem_wait_event event;
-  fread(&event.lock, 4, 1, stdin);
-  printf(" [%0x]\n", event.lock);
-}
-
 int main() {
   struct event_hdr header;
   struct timeval timestamp;
@@ -297,31 +254,17 @@ int main() {
       process_simple_event(stream);
       break;
     case EVENT_WAITQUEUE_WAIT:
-      process_waitqueue_wait_event(stream);
-      break;
     case EVENT_WAITQUEUE_WAKE:
-      process_waitqueue_wake_event(stream);
+    case EVENT_MUTEX_LOCK:
+    case EVENT_MUTEX_WAIT:
+    case EVENT_MUTEX_WAKE:
+    case EVENT_SEMAPHORE_LOCK:
+    case EVENT_SEMAPHORE_WAIT:
+      process_general_lock_event(stream);
       break;
     case EVENT_WAITQUEUE_NOTIFY:
-      process_waitqueue_notify_event(stream);
-      break;
-    case EVENT_MUTEX_LOCK:
-      process_mutex_lock_event(stream);
-      break;
-    case EVENT_MUTEX_WAIT:
-      process_mutex_wait_event(stream);
-      break;
-    case EVENT_MUTEX_WAKE:
-      process_mutex_wake_event(stream);
-      break;
     case EVENT_MUTEX_NOTIFY:
-      process_mutex_notify_event(stream);
-      break;
-    case EVENT_SEMAPHORE_LOCK:
-      process_sem_lock_event(stream);
-      break;
-    case EVENT_SEMAPHORE_WAIT:
-      process_sem_wait_event(stream);
+      process_general_notify_event(stream);
       break;
     case EVENT_PREEMPT_TICK:
     case EVENT_PREEMPT_WAKEUP:
