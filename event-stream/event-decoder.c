@@ -260,10 +260,12 @@ int main() {
     case EVENT_MUTEX_WAKE:
     case EVENT_SEMAPHORE_LOCK:
     case EVENT_SEMAPHORE_WAIT:
+    case EVENT_SEMAPHORE_WAKE:
       process_general_lock_event(stream);
       break;
     case EVENT_WAITQUEUE_NOTIFY:
     case EVENT_MUTEX_NOTIFY:
+    case EVENT_SEMAPHORE_NOTIFY:
       process_general_notify_event(stream);
       break;
     case EVENT_PREEMPT_TICK:
