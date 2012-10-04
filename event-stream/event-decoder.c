@@ -80,6 +80,14 @@ char* event_to_str(int type) {
     return "Lock (sem)";
   case EVENT_SEMAPHORE_WAIT:
     return "Wait (sem)";
+  case EVENT_SEMAPHORE_WAKE:
+    return "Wake (sem)";
+  case EVENT_FUTEX_WAIT:
+    return "Wait (futex)";
+  case EVENT_FUTEX_WAKE:
+    return "Wake (futex)";
+  case EVENT_FUTEX_NOTIFY:
+    return "Notify (futex)";
   case EVENT_IO_BLOCK:
     return "Block (IO)";
   case EVENT_IO_RESUME:
@@ -261,11 +269,14 @@ int main() {
     case EVENT_SEMAPHORE_LOCK:
     case EVENT_SEMAPHORE_WAIT:
     case EVENT_SEMAPHORE_WAKE:
+    case EVENT_FUTEX_WAIT:
+    case EVENT_FUTEX_WAKE:
       process_general_lock_event(stream);
       break;
     case EVENT_WAITQUEUE_NOTIFY:
     case EVENT_MUTEX_NOTIFY:
     case EVENT_SEMAPHORE_NOTIFY:
+    case EVENT_FUTEX_NOTIFY:
       process_general_notify_event(stream);
       break;
     case EVENT_PREEMPT_TICK:
