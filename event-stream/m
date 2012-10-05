@@ -1,0 +1,4 @@
+#!/bin/sh
+
+gcc -o event-decompressor event-decompressor.c minilzo/minilzo.c 
+gcc -o event-decoder event-decoder.c
