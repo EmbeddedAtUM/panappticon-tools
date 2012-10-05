@@ -80,6 +80,8 @@ char* event_to_str(int type) {
     return "Lock (sem)";
   case EVENT_SEMAPHORE_WAIT:
     return "Wait (sem)";
+  case EVENT_SEMAPHORE_NOTIFY:
+    return "Notify (sem)";
   case EVENT_SEMAPHORE_WAKE:
     return "Wake (sem)";
   case EVENT_FUTEX_WAIT:
