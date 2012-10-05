@@ -1,0 +1,3 @@
+#!/bin/sh
+
+./event-read | sort --stable --key=1,2
