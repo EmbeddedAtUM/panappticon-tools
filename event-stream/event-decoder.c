@@ -8,100 +8,59 @@
 
 #define PID_MASK 0x7FFF
 
-char* event_to_str(int type) {
-  switch (type) {
-  case EVENT_SYNC_LOG:
-    return "Sync";
-  case EVENT_MISSED_COUNT:
-    return "Missed Count";
-  case EVENT_CPU_ONLINE:
-    return "CPU Online";
-  case EVENT_CPU_DOWN_PREPARE:
-    return "CPU Down Prepare";
-  case EVENT_CPU_DEAD:
-    return "CPU Offline";
-  case EVENT_SUSPEND_START:
-    return "Suspend Start (to RAM)";
-  case EVENT_SUSPEND:
-    return "Suspend (to RAM)";
-  case EVENT_RESUME:
-    return "Resume (from RAM)";
-  case EVENT_RESUME_FINISH:
-    return "Resume Finish (from RAM)";
-  case EVENT_WAKE_LOCK:
-    return "Wake Lock";
-  case EVENT_WAKE_UNLOCK:
-    return "Wake Unlock";
-  case EVENT_CONTEXT_SWITCH:
-    return "Context Switch";
-  case EVENT_PREEMPT_TICK:
-    return "Preempt Tick";
-  case EVENT_PREEMPT_WAKEUP:
-    return "Preempt Wakeup";
-  case EVENT_YIELD:
-    return "Yield";
-  case EVENT_IDLE_START:
-    return "Idle Start";
-  case EVENT_IDLE_END:
-    return "Idle End";
-  case EVENT_FORK:
-    return "Fork";
-  case EVENT_THREAD_NAME:
-    return "Thread name";
-  case EVENT_EXIT:
-    return "Exit";
-  case EVENT_DATAGRAM_BLOCK:
-    return "Block (datagram)";
-  case EVENT_DATAGRAM_RESUME:
-    return "Resume (datagram)";
-  case EVENT_STREAM_BLOCK:
-    return "Block (stream)";
-  case EVENT_STREAM_RESUME:
-    return "Resume (stream)";
-  case EVENT_SOCK_BLOCK:
-    return "Block (socket)";
-  case EVENT_SOCK_RESUME:
-    return "Resume (socket)";
-  case EVENT_WAITQUEUE_WAIT:
-    return "Wait (waitqueue)";
-  case EVENT_WAITQUEUE_WAKE:
-    return "Wake (waitqueue)";
-  case EVENT_WAITQUEUE_NOTIFY:
-    return "Notify (waitqueue)";
-  case EVENT_MUTEX_LOCK:
-    return "Lock (mutex)";
-  case EVENT_MUTEX_WAIT:
-    return "Wait (mutex)";
-  case EVENT_MUTEX_WAKE:
-    return "Wake (mutex)";
-  case EVENT_MUTEX_NOTIFY:
-    return "Notify (mutex)";
-  case EVENT_SEMAPHORE_LOCK:
-    return "Lock (sem)";
-  case EVENT_SEMAPHORE_WAIT:
-    return "Wait (sem)";
-  case EVENT_SEMAPHORE_NOTIFY:
-    return "Notify (sem)";
-  case EVENT_SEMAPHORE_WAKE:
-    return "Wake (sem)";
-  case EVENT_FUTEX_WAIT:
-    return "Wait (futex)";
-  case EVENT_FUTEX_WAKE:
-    return "Wake (futex)";
-  case EVENT_FUTEX_NOTIFY:
-    return "Notify (futex)";
-  case EVENT_IO_BLOCK:
-    return "Block (IO)";
-  case EVENT_IO_RESUME:
-    return "Resume (IO)";
-  default:
-    return "Unknown";
-  }
+static const char* const event_strings[256] = {
+  [EVENT_SYNC_LOG] = "Sync",
+  [EVENT_MISSED_COUNT] = "Missed Count",
+  [EVENT_CPU_ONLINE] = "CPU Online",
+  [EVENT_CPU_DOWN_PREPARE] = "CPU Down Prepare",
+  [EVENT_CPU_DEAD] = "CPU Offline",
+  [EVENT_SUSPEND_START] = "Suspend Start (to RAM)",
+  [EVENT_SUSPEND] = "Suspend (to RAM)",
+  [EVENT_RESUME] = "Resume (from RAM)",
+  [EVENT_RESUME_FINISH] = "Resume Finish (from RAM)",
+  [EVENT_WAKE_LOCK] = "Wake Lock",
+  [EVENT_WAKE_UNLOCK] = "Wake Unlock",
+  [EVENT_CONTEXT_SWITCH] = "Context Switch",
+  [EVENT_PREEMPT_TICK] = "Preempt Tick",
+  [EVENT_PREEMPT_WAKEUP] = "Preempt Wakeup",
+  [EVENT_YIELD] = "Yield",
+  [EVENT_IDLE_START] = "Idle Start",
+  [EVENT_IDLE_END] = "Idle End",
+  [EVENT_FORK] = "Fork",
+  [EVENT_THREAD_NAME] = "Thread name",
+  [EVENT_EXIT] = "Exit",
+  [EVENT_DATAGRAM_BLOCK] = "Block (datagram)",
+  [EVENT_DATAGRAM_RESUME] = "Resume (datagram)",
+  [EVENT_STREAM_BLOCK] = "Block (stream)",
+  [EVENT_STREAM_RESUME] = "Resume (stream)",
+  [EVENT_SOCK_BLOCK] = "Block (socket)",
+  [EVENT_SOCK_RESUME] = "Resume (socket)",
+  [EVENT_WAITQUEUE_WAIT] = "Wait (waitqueue)",
+  [EVENT_WAITQUEUE_WAKE] = "Wake (waitqueue)",
+  [EVENT_WAITQUEUE_NOTIFY] = "Notify (waitqueue)",
+  [EVENT_MUTEX_LOCK] = "Lock (mutex)",
+  [EVENT_MUTEX_WAIT] = "Wait (mutex)",
+  [EVENT_MUTEX_WAKE] = "Wake (mutex)",
+  [EVENT_MUTEX_NOTIFY] = "Notify (mutex)",
+  [EVENT_SEMAPHORE_LOCK] = "Lock (sem)",
+  [EVENT_SEMAPHORE_WAIT] = "Wait (sem)",
+  [EVENT_SEMAPHORE_NOTIFY] = "Notify (sem)",
+  [EVENT_SEMAPHORE_WAKE] = "Wake (sem)",
+  [EVENT_FUTEX_WAIT] = "Wait (futex)",
+  [EVENT_FUTEX_WAKE] = "Wake (futex)",
+  [EVENT_FUTEX_NOTIFY] = "Notify (futex)",
+  [EVENT_IO_BLOCK] = "Block (IO)",
+  [EVENT_IO_RESUME] = "Resume (IO)",
+  "Unknown"
+};
+
+static inline const char* event_to_str(const int type) {
+  return event_strings[type];
 }
 
 char* TASK_STATE[] = {"Running", "Interruptible", "Uninterruptible", "Stopped", "Traced", NULL, NULL, "Dead", "Wakekill"};
 
-static inline size_t read_next_header(struct event_hdr* header, FILE* stream) {
+inline size_t read_next_header(struct event_hdr* header, FILE* stream) {
   return fread(header, sizeof(*header), 1, stream);
 }
 
