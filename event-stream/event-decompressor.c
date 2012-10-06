@@ -67,7 +67,7 @@ int main() {
   goto out;
 
  errlzo:
-  fprintf(stderr, "Decompression error.\n");
+  fprintf(stderr, "Decompression error: %d\n", ret);
   ret = 1;
   goto out;
 
