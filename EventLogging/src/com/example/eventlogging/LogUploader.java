@@ -1,8 +1,6 @@
 package com.example.eventlogging;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
@@ -115,7 +113,6 @@ public class LogUploader {
 	    try {
 	      BufferedOutputStream sockOut = new BufferedOutputStream(
 	                                          s.getOutputStream(), 1024);
-
 	      /* Write the prefix string to the server. */
 	      sockOut.write(getPrefix(runID, len));
 	      sockOut.write(0);
@@ -123,32 +120,32 @@ public class LogUploader {
 	      /* Write the array to the server. */
 	      int offset = 0;
 	      while(true) {
-	        int sz = (len - offset) > 1024? 1024: (len-offset);
-	        if(sz == 0) break;
-	        sockOut.write(source, offset, sz);
-	        offset += sz;
+	    	  int sz = (len - offset) > 1024? 1024: (len-offset);
+	    	  if(sz == 0) break;
+	    	  sockOut.write(source, offset, sz);
+	    	  offset += sz;
 	      }
 	      sockOut.flush();
 	      int response = s.getInputStream().read();
 	      s.close();
 
 	      if(response != 0) {
-	        Log.w(TAG, "Log data not accepted by server");
+	    	  Log.w(TAG, "Log data not accepted by server");
 	      }
 	    } catch(SocketTimeoutException e) {
 	      /* Connection trouble with server.  Try again later.
 	       */
 	      return false;
 	    } catch(IOException e) {
-	      Log.w(TAG, "Unexpected exception sending log.  Dropping log data");
-	      e.printStackTrace();
+	    	Log.w(TAG, "Unexpected exception sending log.  Dropping log data");
+	    	e.printStackTrace();
 	    }
 	    return true;
 	  }
 
 	  private byte[] getPrefix(long runID, long payloadLength) {
 	    String deviceID = telephonyManager.getDeviceId();
-	    return (getMD5(deviceID) + "|" + payloadLength).getBytes();
+	    return (getMD5(deviceID) + "|user|" + payloadLength).getBytes();
 	  }
 	  
 	  private String getMD5(String s){

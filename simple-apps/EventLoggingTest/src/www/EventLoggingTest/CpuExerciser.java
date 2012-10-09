@@ -1,6 +1,7 @@
 package www.EventLoggingTest;
 
 import android.os.Handler;
+import android.os.Process;
 import android.os.SystemClock;
 import android.util.Log;
 
@@ -22,6 +23,7 @@ public class CpuExerciser implements Runnable
 	}
 	
 	public void run() {
+		Log.d(TAG,"Lide: cpuexerciser pid is" + Process.myPid() + " " + Process.myTid());
 			exerciser(mLoad);
 			mHandler.post(mActivity.mUpdateButton);
 			return;

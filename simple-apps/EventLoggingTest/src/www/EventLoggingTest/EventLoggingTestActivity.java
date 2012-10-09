@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.os.Process;
 
 public class EventLoggingTestActivity extends Activity {
 	
@@ -18,6 +19,7 @@ public class EventLoggingTestActivity extends Activity {
 	        public void run() {
 	        	Log.d(TAG,"****In the update runnable");
 	            updateButton();
+	            Log.d(TAG,"Lide: runnable My pid is" + Process.myPid() + " " + Process.myTid());
 	        }
 	    };
     /** Called when the activity is first created. */
@@ -31,6 +33,8 @@ public class EventLoggingTestActivity extends Activity {
         mThreadStartButton.setOnClickListener(threadStartButtonListener);
         mThreadStartButton.setText("Start CPU exerciser!");
         mThreadStartButton.setBackgroundColor(Color.GREEN);
+        
+        Log.d(TAG,"Lide: main activity My pid is" + Process.myPid() + " " + Process.myTid());
     }
     
     public void onStart(){
