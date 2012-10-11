@@ -23,6 +23,9 @@ import android.util.Log;
  */
 public class LogUploader {
 	private final String TAG = "LogUploader";
+	public final static int USER_MODE = 0;
+	public final static int KERNEL_MODE = 1;
+	
 	private Thread uploadThread;
 	
 	private static final int CONNECTION_NONE = 0;
@@ -61,16 +64,17 @@ public class LogUploader {
 	    return CONNECTION_NONE;
 	  }
 	
-	public void upload(final byte [] source, final int len) {
-	    uploadThread = new UploadThread(source, len);
+	public void upload(byte [] source, int len, int mode) {
+	    uploadThread = new UploadThread(source, len, mode);
 	    uploadThread.start();
 	  }
 	
 	private class UploadThread extends Thread{
 		private byte [] mSource;
 	    private int mLen;
+	    private int mMode;
 	    
-		public UploadThread(byte [] source, int len){
+		public UploadThread(byte [] source, int len, int mode){
 	    	  mSource = source;
 	    	  mLen = len;
 	      }
@@ -78,7 +82,7 @@ public class LogUploader {
 		public void run() {
 			 long runID = System.currentTimeMillis();
 		        for(int iter = 1; !interrupted(); iter++) {
-		          if(send(runID, mSource, mLen)) {
+		          if(send(runID, mSource, mLen, mMode)) {
 		            break;
 		          }
 		          if(iter > 12) iter = 12; // The max wait is a little over 1 hour.
@@ -98,7 +102,7 @@ public class LogUploader {
 			
 		}
 		
-	public boolean send(long runID, byte[] source, int len) {
+	public boolean send(long runID, byte[] source, int len, int mode) {
 	    Log.i(TAG, "Sending log data");
 	    Socket s = new Socket();
 	    try {
@@ -114,7 +118,7 @@ public class LogUploader {
 	      BufferedOutputStream sockOut = new BufferedOutputStream(
 	                                          s.getOutputStream(), 1024);
 	      /* Write the prefix string to the server. */
-	      sockOut.write(getPrefix(runID, len));
+	      sockOut.write(getPrefix(runID, len, mode));
 	      sockOut.write(0);
 
 	      /* Write the array to the server. */
@@ -143,9 +147,14 @@ public class LogUploader {
 	    return true;
 	  }
 
-	  private byte[] getPrefix(long runID, long payloadLength) {
+	  private byte[] getPrefix(long runID, long payloadLength, int mode) {
 	    String deviceID = telephonyManager.getDeviceId();
-	    return (getMD5(deviceID) + "|user|" + payloadLength).getBytes();
+	    String selectMode;
+	    if(mode == USER_MODE)
+	    	selectMode = "user";
+	    else
+	    	selectMode = "kernel";
+	    return (getMD5(deviceID) + "|"+ selectMode+"|" + payloadLength).getBytes();
 	  }
 	  
 	  private String getMD5(String s){

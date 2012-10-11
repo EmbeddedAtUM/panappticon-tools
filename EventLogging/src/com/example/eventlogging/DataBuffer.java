@@ -8,8 +8,9 @@ import android.util.Log;
 
 public class DataBuffer {
 	private final String TAG = "DataBuffer";
+	
 
-	private final int BUFFER_SIZE = 100*1024;
+	private final int BUFFER_SIZE = 1000*1024;//
 	private final boolean DEBUG_SERVER = true;
 	
 	private ByteBuffer [] mByteBuffers;
@@ -71,7 +72,7 @@ public class DataBuffer {
 	
 	/* Export the buffer to Internet*/
 	public void export_buffer(int cur_buffer){
-		mUploader.upload(mByteBuffers[cur_buffer].array(), mLength[cur_buffer]);
+		mUploader.upload(mByteBuffers[cur_buffer].array(), mLength[cur_buffer], LogUploader.USER_MODE);
 		mByteBuffers[cur_buffer].rewind();
 		mLength[cur_buffer] = 0;
 	}

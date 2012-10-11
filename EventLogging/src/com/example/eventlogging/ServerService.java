@@ -9,12 +9,14 @@ import android.util.Log;
 public class ServerService extends Service{
 	private final String TAG = "ServerService";
 	
-	private UserSpaceServer mServer;
+	private UserSpaceServer mUserServer;
+	private KernelEventServer mKernelServer;
 	private Writer mWriter;
 	private DataBuffer mDataBuffer;
 	 @Override
 	public void onCreate() {
-	     mServer = new UserSpaceServer();
+	     mUserServer = new UserSpaceServer();
+	     mKernelServer = new KernelEventServer(this);
 	     mWriter = Writer.getInstance();  
 	     mDataBuffer = DataBuffer.getInstance();
 	 }
@@ -22,8 +24,10 @@ public class ServerService extends Service{
 	public int onStartCommand(Intent intent, int flags, int startId) {
 	        mWriter.initialize(this);
 	        mDataBuffer.initialize(this);
-	        Thread t1 = new Thread(mServer);
+	        Thread t1 = new Thread(mUserServer);
 	        t1.start();
+	        Thread t2 = new Thread(mKernelServer);
+	        t2.start();
 		    int START_STICKY = 1;
 	        return START_STICKY;
 	    }
@@ -36,7 +40,8 @@ public class ServerService extends Service{
 	@Override
     public void onDestroy() {
 	 Log.d(TAG,"Service on destroy");
-	 mServer.stop();
+	 mUserServer.stop();
+	 mKernelServer.stop();
 	 mWriter.close();
     }
 
