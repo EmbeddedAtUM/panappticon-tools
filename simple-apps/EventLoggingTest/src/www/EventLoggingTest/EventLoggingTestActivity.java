@@ -17,7 +17,7 @@ public class EventLoggingTestActivity extends Activity {
 	
 	 final Runnable mUpdateButton = new Runnable() {
 	        public void run() {
-	        	Log.d(TAG,"****In the update runnable");
+	        	Log.d(TAG,"****In the update runnable "+mUpdateButton.hashCode()+" "+mUpdateButton.toString());
 	            updateButton();
 	            Log.d(TAG,"Lide: runnable My pid is" + Process.myPid() + " " + Process.myTid());
 	        }

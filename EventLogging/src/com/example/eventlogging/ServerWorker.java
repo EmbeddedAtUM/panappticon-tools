@@ -18,7 +18,7 @@ public class ServerWorker implements Runnable{
 	
 	@Override
 	public void run() {
-		byte buffer[] = new byte[1024*20];
+		byte buffer[] = new byte[1024*24];
 		try {
 			//Get the header first
 			mySocket.setSoTimeout(30000);

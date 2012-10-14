@@ -77,6 +77,7 @@ public class LogUploader {
 		public UploadThread(byte [] source, int len, int mode){
 	    	  mSource = source;
 	    	  mLen = len;
+	    	  mMode = mode;
 	      }
 		@Override
 		public void run() {
@@ -103,7 +104,7 @@ public class LogUploader {
 		}
 		
 	public boolean send(long runID, byte[] source, int len, int mode) {
-	    Log.i(TAG, "Sending log data");
+	    Log.i(TAG, "Sending log data " + len + " "+ mode);
 	    Socket s = new Socket();
 	    try {
 	      s.setSoTimeout(4000);
@@ -125,7 +126,7 @@ public class LogUploader {
 	      int offset = 0;
 	      while(true) {
 	    	  int sz = (len - offset) > 1024? 1024: (len-offset);
-	    	  if(sz == 0) break;
+	    	  if(sz <= 0) break;
 	    	  sockOut.write(source, offset, sz);
 	    	  offset += sz;
 	      }
@@ -150,10 +151,16 @@ public class LogUploader {
 	  private byte[] getPrefix(long runID, long payloadLength, int mode) {
 	    String deviceID = telephonyManager.getDeviceId();
 	    String selectMode;
-	    if(mode == USER_MODE)
+	    if(mode == USER_MODE){
 	    	selectMode = "user";
-	    else
+	    	Log.d("Lide","select user mode "+ selectMode);
+		    
+	    }
+	    else{
 	    	selectMode = "kernel";
+	    	Log.d("Lide","select kernel mode "+ selectMode);
+			
+	    }
 	    return (getMD5(deviceID) + "|"+ selectMode+"|" + payloadLength).getBytes();
 	  }
 	  

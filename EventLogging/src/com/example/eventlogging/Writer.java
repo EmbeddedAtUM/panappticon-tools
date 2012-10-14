@@ -31,9 +31,9 @@ public class Writer {
 		}
 	}
 	
-	public void writeBytes(byte [] buffer){
+	public void writeBytes(byte [] buffer, int len){
 		try {
-			fout.write(buffer);
+			fout.write(buffer,0, len);
 			fout.flush();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -46,7 +46,7 @@ public class Writer {
 			ByteBuffer tmp = ByteBuffer.wrap(buffer);
 			tmp.order(ByteOrder.LITTLE_ENDIAN);
 			for(int i=0; i< len/24; i++)
-				osw.write(tmp.getLong()+":"+tmp.getInt()+":"+tmp.getInt()+":"+tmp.getInt()+":"+tmp.getInt()+" ");
+				osw.write(tmp.getLong()+":"+tmp.getInt()+":"+tmp.getInt()+":"+tmp.getInt()+":"+tmp.getInt()+"\n");
 			osw.flush();
 		} catch (IOException e) {
 			e.printStackTrace();

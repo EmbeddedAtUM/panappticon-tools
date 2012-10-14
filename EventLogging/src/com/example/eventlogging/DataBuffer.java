@@ -65,14 +65,18 @@ public class DataBuffer {
 	/* Export the buffer to file*/
 	/*public void export_buffer(int cur_buffer){
 		Writer writer = Writer.getInstance(); 	
-		writer.writeBytes(mByteBuffers[cur_buffer].array());
+		writer.writeBytes(mByteBuffers[cur_buffer].array(),mLength[cur_buffer]);
 		//writer.writeString(mByteBuffers[cur_buffer].array(), mLength[cur_buffer]);
+		mByteBuffers[cur_buffer].rewind();
+		mLength[cur_buffer]=0;
 	}*/
 	
 	
 	/* Export the buffer to Internet*/
 	public void export_buffer(int cur_buffer){
-		mUploader.upload(mByteBuffers[cur_buffer].array(), mLength[cur_buffer], LogUploader.USER_MODE);
+		byte [] tmp_buffer = new byte[mLength[cur_buffer]];
+		System.arraycopy(mByteBuffers[cur_buffer].array(), 0, tmp_buffer, 0, mLength[cur_buffer]);	
+		mUploader.upload(tmp_buffer, mLength[cur_buffer], LogUploader.USER_MODE);
 		mByteBuffers[cur_buffer].rewind();
 		mLength[cur_buffer] = 0;
 	}

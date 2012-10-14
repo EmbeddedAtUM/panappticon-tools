@@ -23,7 +23,6 @@ int main() {
     compressed = malloc(len);
     if (!compressed)
       goto errmem;
-
     uncmp_len = 10 * len; // Hopefully 10X is enough...
     uncompressed = malloc(uncmp_len); 
     if (!uncompressed)

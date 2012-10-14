@@ -26,6 +26,7 @@ public class CpuExerciser implements Runnable
 		Log.d(TAG,"Lide: cpuexerciser pid is" + Process.myPid() + " " + Process.myTid());
 			exerciser(mLoad);
 			mHandler.post(mActivity.mUpdateButton);
+			Log.d(TAG,"Lide runnable from worker is "+ mActivity.mUpdateButton.hashCode()+" "+mActivity.mUpdateButton.toString());
 			return;
 	}
 	private void exerciser (int mLoad){
