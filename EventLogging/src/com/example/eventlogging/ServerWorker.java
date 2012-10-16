@@ -19,6 +19,7 @@ public class ServerWorker implements Runnable{
 	@Override
 	public void run() {
 		byte buffer[] = new byte[1024*24];
+		//TODO: consider changes it into 24*5000 due to the framework parameter
 		try {
 			//Get the header first
 			mySocket.setSoTimeout(30000);
@@ -39,7 +40,8 @@ public class ServerWorker implements Runnable{
 				mySocket.close();
 				return;
 			}
-			DataBuffer myBuffer = DataBuffer.getInstance();
+			//DataBuffer myBuffer = DataBuffer.getInstance();
+			BufferQueue myBuffer = BufferQueue.getInstance();
 			while(payLoadLength > 0){
 				int size = in.read(buffer,0,(int)Math.min(buffer.length, payLoadLength));
 				if(size == -1){
@@ -48,7 +50,8 @@ public class ServerWorker implements Runnable{
 					return;
 				}
 				payLoadLength -= size;
-				myBuffer.WriteToBuffer(buffer, size);	
+				myBuffer.WriteToBuffer(buffer, size, BufferQueue.USER_MODE);
+				//myBuffer.WriteToBuffer(buffer, size);	
 			}
 			mySocket.getOutputStream().write(0);
 		

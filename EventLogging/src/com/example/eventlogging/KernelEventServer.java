@@ -37,16 +37,13 @@ public class KernelEventServer implements Runnable{
 	private volatile boolean running;
 
 	private Thread thread;
-
-	private BlockingQueue<ByteBuffer> queue;
 	
-	private LogUploader mUploader;
+	private BufferQueue mBufferQueue;
 	
 
 	public KernelEventServer(Context context) {
 		running = false;
-		queue = new LinkedBlockingQueue<ByteBuffer>();
-		mUploader = new LogUploader(context);
+		mBufferQueue = BufferQueue.getInstance();
 		running = true;
 	}
 
@@ -65,9 +62,9 @@ public class KernelEventServer implements Runnable{
 	 * 
 	 * @return the queue of event log buffers
 	 */
-	public BlockingQueue<ByteBuffer> queue() {
+/*	public BlockingQueue<ByteBuffer> queue() {
 		return queue;
-	}
+	}*/
 
 	public void run() {
 		FileInputStream freader = null;
@@ -87,7 +84,6 @@ public class KernelEventServer implements Runnable{
 				Log.d("Lide", "Kernel server starts read "+size);
 				byte[] buffer = new byte[size + 4];
 				System.arraycopy(sizebytes, 0, buffer, 0, 4);
-				
 				int readLen = size;
 				int pos = 4;
 				while(readLen > 0){
@@ -95,14 +91,7 @@ public class KernelEventServer implements Runnable{
 					pos += sz;
 					readLen -= sz;
 				}
-				Log.d("Lide", "Kernel server starts send " + (size+4));
-				mUploader.upload(buffer, size+4, LogUploader.KERNEL_MODE);
-				/*if (queue.offer(ByteBuffer.wrap(buffer))) {
-					Log.i(TAG, "Queued new buffer");
-				} else {
-					Log.e(TAG, "Queue full. Dropping buffer.");
-				}*/
-
+				mBufferQueue.WriteToBuffer(buffer, size+4, BufferQueue.KERNEL_MODE);
 			}
 		} catch (FileNotFoundException e) {
 			Log.e(TAG, "Failed to open proc file", e);

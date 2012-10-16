@@ -1,5 +1,6 @@
 package com.example.eventlogging;
 
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
@@ -11,56 +12,39 @@ import android.util.Log;
 
 
 public class Writer {
-	private String filename = "user_trace";
+	private static String TAG = "LogUploader";
 	private static Writer mWriter = new Writer();
 	
 	private FileOutputStream fout;
-	private OutputStreamWriter osw; 
-	
 	public static Writer getInstance(){
 		return mWriter;
 	}
 	
 	
 	public void initialize(Context context){
-		try{
-			 fout = context.openFileOutput(filename, Context.MODE_WORLD_READABLE);
-			 osw = new OutputStreamWriter (fout);
-		}catch(IOException ioe){
-			ioe.printStackTrace();
-		}
+		File UserDirectory = new File("/sdcard/user/");
+		UserDirectory.mkdir();
+		File KernelDirectory = new File("/sdcard/kernel/");
+		KernelDirectory.mkdir();
 	}
 	
-	public void writeBytes(byte [] buffer, int len){
-		try {
-			fout.write(buffer,0, len);
+	public void writeToFile(long runId, byte [] buffer, int len, int mode)
+	{
+		String filename = "";
+		if(mode == BufferQueue.KERNEL_MODE)
+			filename = filename + "kernel/";
+		else
+			filename = filename+ "user/";
+		filename = filename+ runId;
+		Log.d(TAG,"Write to file "+ filename);
+		try{
+			fout = new FileOutputStream("/sdcard/"+filename);
+			//fout = mContext.openFileOutput(filename, Context.MODE_WORLD_READABLE);
+			fout.write(buffer,0,len);
 			fout.flush();
-		} catch (IOException e) {
-			e.printStackTrace();
+			fout.close();
+		}catch(IOException ioe){
+			
 		}
 	}
-	
-	public void writeString(byte [] buffer, int len){
-		Log.d("Server", "Write to file with string "+ len);
-		try {
-			ByteBuffer tmp = ByteBuffer.wrap(buffer);
-			tmp.order(ByteOrder.LITTLE_ENDIAN);
-			for(int i=0; i< len/24; i++)
-				osw.write(tmp.getLong()+":"+tmp.getInt()+":"+tmp.getInt()+":"+tmp.getInt()+":"+tmp.getInt()+"\n");
-			osw.flush();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	public void close(){
-		try{
-			osw.flush();
-			osw.close();
-		}catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-	}
-
 }

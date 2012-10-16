@@ -103,4 +103,7 @@ public class EventLoggingActivity extends Activity {
     		mIsBound = false;
     	}
     }
+    
+    
+    
 }

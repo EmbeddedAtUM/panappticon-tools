@@ -8,6 +8,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+//import java.util.EventLogging;
 
 import android.content.Context;
 import android.net.ConnectivityManager;
@@ -28,9 +29,11 @@ public class LogUploader {
 	
 	private Thread uploadThread;
 	
-	private static final int CONNECTION_NONE = 0;
-	private static final int CONNECTION_WIFI = 1;
-	private static final int CONNECTION_3G = 2;
+	public static final int CONNECTION_NONE = 0;
+	public static final int CONNECTION_WIFI = 1;
+	public static final int CONNECTION_3G = 2;
+	
+	public static final int UPLOAD_THRESHOLD = 2*1024*1024;//10M 
 	
 	private static final String SERVER_IP = "gambit.eecs.umich.edu"; 
 	private static final int SERVER_PORT = 5204;
@@ -38,14 +41,18 @@ public class LogUploader {
 	private ConnectivityManager connectivityManager;
 	private TelephonyManager telephonyManager;
 	
+	private Writer mWriter;
+	
 	public LogUploader(Context context){
 	    telephonyManager = (TelephonyManager)context.getSystemService(
                 Context.TELEPHONY_SERVICE); 
 	    connectivityManager = (ConnectivityManager)context.getSystemService(
                     Context.CONNECTIVITY_SERVICE);
+	    
+	    mWriter = Writer.getInstance();
 	}
 	
-	private int connectionAvailable() {
+	public int connectionAvailable() {
 	    /* TODO: Maybe we should only send data when the device is plugged in.
 	     */
 	    NetworkInfo info = connectivityManager.getActiveNetworkInfo();
@@ -65,43 +72,65 @@ public class LogUploader {
 	  }
 	
 	public void upload(byte [] source, int len, int mode) {
-	    uploadThread = new UploadThread(source, len, mode);
+	    uploadThread = new UploadThread(source, len, mode, 0);
 	    uploadThread.start();
 	  }
+	
+	public void upload(byte [] source, int len, int mode, long runID){
+		  uploadThread = new UploadThread(source, len, mode, runID);
+		  uploadThread.start();
+	}
 	
 	private class UploadThread extends Thread{
 		private byte [] mSource;
 	    private int mLen;
 	    private int mMode;
+	    private long mRunID;
 	    
-		public UploadThread(byte [] source, int len, int mode){
+		public UploadThread(byte [] source, int len, int mode, long runID){
 	    	  mSource = source;
 	    	  mLen = len;
 	    	  mMode = mode;
+	    	  mRunID = runID;
 	      }
 		@Override
 		public void run() {
-			 long runID = System.currentTimeMillis();
-		        for(int iter = 1; !interrupted(); iter++) {
-		          if(send(runID, mSource, mLen, mMode)) {
+		    int success = 1;
+		    long runID = (mRunID == 0)?System.currentTimeMillis(): mRunID;
+		    //EventLogging eventLogging = EventLogging.getInstance();
+		    for(int iter = 1; !interrupted(); iter++) {
+		    	
+		    	//eventlogging.addEvent(EventLogging.EVENT_UPLOAD_TRACE);
+		    	boolean send_success = send(runID, mSource, mLen, mMode);
+		    	//eventlogging.addEvent(EventLogging.EVENT_UPLOAD_DONE);
+
+			if(send(runID, mSource, mLen, mMode)) {
 		            break;
-		          }
-		          if(iter > 12) iter = 12; // The max wait is a little over 1 hour.
-		          Log.i(TAG, "Failed to send log.  Will try again in " + (1 << iter) +
+		        }
+		        if(iter > 4){ 
+		        	success = 0;
+		        	break; // The max wait is 30 seconds.
+		        }
+		        Log.i(TAG, "Failed to send log.  Will try again in " + (1 << iter) +
 		                     " seconds");
-		          try {
-		            do {
+		        try {
+		        	//do {
 		              sleep(1000 * (1 << iter)); // Sleep for 2^iter seconds.
 		              Log.i(TAG, "Failed log sending, sleep for " + (1 << iter) +
 		              " seconds");
-		            } while(connectionAvailable() == CONNECTION_NONE);
-		          } catch(InterruptedException e) {
-		            break;
-		          }
-		        }
-		      }
-			
-		}
+		            //} while((connectionAvailable() == CONNECTION_NONE)||(connectionAvailable() == CONNECTION_3G));
+		         	} catch(InterruptedException e) {
+		         		//break;
+		         	}
+		    }
+		    if(success == 0){
+		    	//eventlogging.addEvent(EventLogging.EVENT_WRITE_TRACE);    
+			mWriter.writeToFile(runID, mSource, mLen, mMode);
+		    	//eventlogging.addEvent(EventLogging.EVENT_WRITE_DONE);
+		    }
+		    	
+		}	
+	}
 		
 	public boolean send(long runID, byte[] source, int len, int mode) {
 	    Log.i(TAG, "Sending log data " + len + " "+ mode);
