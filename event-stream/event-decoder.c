@@ -14,6 +14,7 @@ static const char* const event_strings[256] = {
   [EVENT_CPU_ONLINE] = "CPU Online",
   [EVENT_CPU_DOWN_PREPARE] = "CPU Down Prepare",
   [EVENT_CPU_DEAD] = "CPU Offline",
+  [EVENT_CPUFREQ_SET] = "Cpufreq Set",
   [EVENT_SUSPEND_START] = "Suspend Start (to RAM)",
   [EVENT_SUSPEND] = "Suspend (to RAM)",
   [EVENT_RESUME] = "Resume (from RAM)",
@@ -145,6 +146,14 @@ void process_hotcpu_event(FILE* stream, struct event_hdr* header, struct timeval
   printf(": %d\n", event.cpu);
 }
 
+void process_cpufreq_set_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
+  struct cpufreq_set_event event;
+  fread(&event.cpu, 1, 1, stream);
+  fread(&event.old_freq, 4, 1, stream);
+  fread(&event.new_freq, 4, 1, stream);
+  printf(": [CPU %d] %d -> %d\n", event.cpu, event.old_freq, event.new_freq);
+}
+
 void process_context_switch_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
   struct context_switch_event event;
   fread(&event.new_pid, 2, 1, stdin);
@@ -189,6 +198,7 @@ static decode_event_func decoders[256] = {
   [EVENT_CPU_ONLINE]		= process_hotcpu_event,
   [EVENT_CPU_DOWN_PREPARE]	= process_hotcpu_event,
   [EVENT_CPU_DEAD]		= process_hotcpu_event,
+  [EVENT_CPUFREQ_SET]           = process_cpufreq_set_event,
   [EVENT_THREAD_NAME]		= process_thread_name_event,
   [EVENT_CONTEXT_SWITCH]	= process_context_switch_event,
   [EVENT_WAKE_LOCK]		= process_wake_lock_event,
