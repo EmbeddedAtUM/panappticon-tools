@@ -4,7 +4,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE_TAGS := optional
 
 LOCAL_STATIC_JAVA_LIBRARIES := \
-        android-support-v16 \
+        android-support-v13 \
         android-support-v4 \
 
 LOCAL_SRC_FILES := \
