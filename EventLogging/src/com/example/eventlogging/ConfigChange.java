@@ -2,52 +2,87 @@ package com.example.eventlogging;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Random;
 import java.util.ArrayDeque;
+import java.lang.Process;
+import java.util.EventLogging;
+
 import android.util.Log;
 
-public class ConfigChange {
+public class ConfigChange extends Thread{
 	private final String TAG = "ConfigChange";
+	private final int CHECKING_INTERVAL = 10* 60 * 1000; // 10 minutes
+	
 	public static final int DVFS_ON_DUO = 0;
 	public static final int DVFS_OFF_DUO = 1;
 	public static final int DVFS_ON_SINGLE = 2;
 	public static final int DVFS_OFF_SINGLE = 3;
 	
+	private static final int NUM_SAMPLE = 10;
+	
 	private final String FREQ_GOVERNOR = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor";
 	private final String FREQ_SETSPEED = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed";
 	private final String CPU_ONLINE = "/sys/devices/system/cpu/cpu1/online";
 	
-	private ArrayDeque<Double> usageQueue;
-	private double sumQueue;
-	private double avgUsage;
 	
 	private ArrayDeque<Integer> configQueue;
 	private int [] count;
 	
 	private Random random;
 	
-	public ConfigChange(){
-		sumQueue = 0;
-		avgUsage = 0;
+	private boolean active;
+	
+	private long [] statsBuf;
+	private long mTotal;
+	private long mUser;
+	private long mSystem;
+	
+	public ConfigChange() {
 		int i =0;
 		count = new int[4];
 		for(i=0; i<4; i++){
 			count[i]=0;
 			}
 		random = new Random();
-		usageQueue = new ArrayDeque<Double>();
-		configQueue = new ArrayDeque<Integer>();
+		configQueue = new ArrayDeque();
 		GainAccess();
 		ChangeDVFS(0);
+		active = true;
+		
+		statsBuf = new long[8];
+		mTotal = 0;
+		mUser = 0;
+		mSystem = 0;
 		}
+	
+	@Override
+	public void run() {
+		while((active) && (!interrupted()))
+		{
+			if(ShouldChangeConfig())
+			{
+				Log.i(TAG,"Should change configuration");
+				ChangeConfig();
+			}
+			try {
+				sleep(CHECKING_INTERVAL);
+			} catch (InterruptedException e) {
+				break;
+			}		
+		}
+	}	
+	
+	public void terminate(){
+		active = false;
+		interrupt();
+	}
 	
 	public void GainAccess(){
 		try {
 			Process process = Runtime.getRuntime().exec("su");
 			DataOutputStream os = new DataOutputStream(process.getOutputStream());
-			/*os.writeBytes("chmod 777 "+ FREQ_GOVERNOR);
-			os.writeBytes("chmod 777 " + FREQ_SETSPEED);
-			os.writeBytes("chmod 777 "+ CPU_ONLINE);*/
 			os.writeBytes("exit\n");
 			os.flush();
 			os.close();
@@ -58,92 +93,59 @@ public class ConfigChange {
 			Log.d(TAG,"Got interrupted while waiting for command");
 		}
 	}
-	
+	/* 
+	 * Monitor the average utilization for NUM_SAMPLE seconds and then determine
+	 */	
 	public boolean ShouldChangeConfig(){
+		fastReadStats();
+		double avgUsage = 0;
+		for(int i=0; i< NUM_SAMPLE; i++)
+		{
+			try {
+				sleep(1000);
+			 } catch (InterruptedException e) {
+				// The thread got terminated
+				return false;
+			}
+		}
+		avgUsage = fastReadStats();
 		if(avgUsage < 10.0)
 			return true;
 		else
 			return false;
 	}
 	
-	public void updateQueue(double usage){
-		if(usageQueue.size()<10){
-			usageQueue.add(usage);
-			sumQueue += usage;
-			avgUsage = sumQueue/usageQueue.size();
-		}else{
-			double removed = (double) usageQueue.remove();
-			sumQueue -= removed;
-			usageQueue.add(usage);
-			sumQueue += usage;
-			avgUsage = sumQueue/usageQueue.size();
+	private void ExecuteCommand(String cmd)
+	{
+		try {
+			Process process = Runtime.getRuntime().exec("su");
+			DataOutputStream os = new DataOutputStream(process.getOutputStream());
+			os.writeBytes(cmd + "\n");
+			os.writeBytes("exit\n");
+			os.flush();
+			os.close();
+			process.waitFor();
+		} catch (IOException e) {
+			Log.d(TAG,"Cannot execute command "+ cmd);			
+			} catch (InterruptedException e) {
+			Log.d(TAG,"Got interrupted while waiting for command");
 		}
 	}
 	
 	public void ChangeDVFS(int dvfs)
 	{
-		if(dvfs == 1){
-			try {
-				Process process = Runtime.getRuntime().exec("su");
-				DataOutputStream os = new DataOutputStream(process.getOutputStream());
-				os.writeBytes("echo interactive > "+FREQ_GOVERNOR + "\n");
-				os.writeBytes("exit\n");
-				os.flush();
-				os.close();
-				process.waitFor();
-			} catch (IOException e) {
-				Log.d(TAG,"Cannot change frequency governor");			
-				} catch (InterruptedException e) {
-				Log.d(TAG,"Got interrupted while waiting for command");
-			}
+		if(dvfs == 1){// Turn on DVFS
+			ExecuteCommand("echo interactive > "+FREQ_GOVERNOR );
 		}else{//Turn off DVFS
-			try {
-				Process process = Runtime.getRuntime().exec("su");
-				DataOutputStream os = new DataOutputStream(process.getOutputStream());
-				os.writeBytes("echo userspace > "+FREQ_GOVERNOR + "\n");
-				os.flush();
-				os.writeBytes("echo 1200000 > "+FREQ_SETSPEED +"\n");
-				os.writeBytes("exit\n");
-				os.flush();
-				os.close();
-				process.waitFor();
-			} catch (IOException e) {
-				Log.d(TAG,"Cannot change frequency governor");			
-				} catch (InterruptedException e) {
-				Log.d(TAG,"Got interrupted while waiting for command");
-			}
+			ExecuteCommand("echo userspace > "+FREQ_GOVERNOR + "\n" + "echo 1200000 > "+FREQ_SETSPEED);
 		}
 	}
 	
 	public void ChangeCore(int core){
 		if(core == 1){//duo core running
-			try {
-				Process process = Runtime.getRuntime().exec("su");
-				DataOutputStream os = new DataOutputStream(process.getOutputStream());
-				os.writeBytes("echo 1 > "+CPU_ONLINE+ "\n");
-				os.writeBytes("exit\n");
-				os.flush();
-				os.close();
-				process.waitFor();
-			} catch (IOException e) {
-				Log.d(TAG,"Cannot make core 1 online");			
-				} catch (InterruptedException e) {
-				Log.d(TAG,"Got interrupted while waiting for command");
-			}
+			ExecuteCommand("echo 1 > "+CPU_ONLINE);
 		}else{//single core running
-			try {
-				Process process = Runtime.getRuntime().exec("su");
-				DataOutputStream os = new DataOutputStream(process.getOutputStream());
-				os.writeBytes("echo 0 > "+CPU_ONLINE+ "\n");
-				os.writeBytes("exit\n");
-				os.flush();
-				os.close();
-				process.waitFor();
-			} catch (IOException e) {
-				Log.d(TAG,"Cannot make core 1 online");			
-				} catch (InterruptedException e) {
-				Log.d(TAG,"Got interrupted while waiting for command");
-			}
+			ExecuteCommand("echo 0 > "+CPU_ONLINE);
 		}
 	}
 	
@@ -197,6 +199,42 @@ public class ConfigChange {
 			SwitchToConfig(next_config);
 			
 		}
+		EventLogging eventlogging = EventLogging.getInstance();
+		eventlogging.addEvent(EventLogging.EVENT_SWITCH_CONFIG, next_config);
 		return next_config;
+	}
+	public double fastReadStats(){
+		SystemInfo sysInfo = SystemInfo.getInstance();
+		
+		if(!sysInfo.getUsrSysTotalTime(statsBuf)){
+			Log.d(TAG,"Failed to read cpu times");
+			return 0.0;
+		}
+		long usrTime = statsBuf[SystemInfo.INDEX_USER_TIME];
+		long sysTime = statsBuf[SystemInfo.INDEX_SYS_TIME];
+		long totalTime = statsBuf[SystemInfo.INDEX_TOTAL_TIME];
+		
+		double usr_sys_perc = updateStats(usrTime, sysTime, totalTime);
+		Log.d(TAG,"User stats: "+ usrTime + " "+ sysTime + " "+ totalTime+ " "+ usr_sys_perc);
+		return usr_sys_perc;	
+	}
+	
+	private double updateStats(long user, long system, long total)
+	{
+		double user_sys_perc = 0.0;
+		double user_perc = 0.0;
+		double sys_perc = 0.0;
+		if (mTotal != 0 || total >= mTotal) {
+			long duser = user - mUser;
+			long dsystem = system - mSystem;
+			long dtotal = total - mTotal;
+			user_sys_perc = (double)(duser+dsystem)*100.0/dtotal;
+			user_perc = (double)(duser)*100.0/dtotal;
+			sys_perc = (double)(dsystem)*100.0/dtotal;
+		} 
+		mUser = user;
+		mSystem = system;
+		mTotal = total;	
+		return user_sys_perc;
 	}
 }

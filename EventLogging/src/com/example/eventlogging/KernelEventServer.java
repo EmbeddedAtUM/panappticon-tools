@@ -26,7 +26,7 @@ import android.util.Log;
  * @author David R. Bild modified by Lide Zhang
  * 
  */
-public class KernelEventServer implements Runnable{
+public class KernelEventServer extends Thread{
 	private static final String TAG = "KernelEventLog";
 
 	/**
@@ -51,10 +51,9 @@ public class KernelEventServer implements Runnable{
 	/**
 	 * Stops retrieving logs from the kernel.
 	 */
-	public void stop() {
+	public void terminate() {
 		running = false;
-		if (thread != null)
-			thread.interrupt();
+		interrupt();
 	}
 
 	/**

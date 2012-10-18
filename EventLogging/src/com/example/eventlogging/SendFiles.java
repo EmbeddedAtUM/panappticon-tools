@@ -19,25 +19,27 @@ public class SendFiles implements Runnable{
 	}
 	@Override
 	public void run() {
-		if(mUploader.connectionAvailable() == mUploader.CONNECTION_WIFI){
-			ReadAndSend(kernel_path, BufferQueue.KERNEL_MODE);
-			ReadAndSend(user_path, BufferQueue.USER_MODE);
-		}
+		ReadAndSend(kernel_path, BufferQueue.KERNEL_MODE);
+		ReadAndSend(user_path, BufferQueue.USER_MODE);
+		
 	}
+	
 	
 	private void ReadAndSend(String file_path, int mode){
 		File[] files = new File(file_path).listFiles();
 		for(File file: files){
-			Log.d("ServerService","filename  is "+ file.getName()+file.length());
+			//if(mUploader.connectionAvailable() != mUploader.CONNECTION_WIFI) // The connectivity can change, so check again
+			//	break;
+			Log.d("LogUploader","filename  is "+ file.getName()+file.length());
 			byte [] file_buffer = new byte[(int)file.length()];
 			try {
 				BufferedInputStream in= new BufferedInputStream(new FileInputStream(file));
 				int sz = in.read(file_buffer, 0, (int) file.length());
 				if(sz == -1)
 					continue;
-				mUploader.upload(file_buffer, (int)file.length(), mode, Long.valueOf(file.getName()));
+				boolean success = mUploader.send(Long.valueOf(file.getName()),file_buffer, (int)file.length(), mode);
 				in.close();
-				file.delete();
+				if(success) file.delete();
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();
 			} catch (IOException e) {
@@ -45,6 +47,13 @@ public class SendFiles implements Runnable{
 				e.printStackTrace();
 			}		
 		}
+	}
+	
+	/* Should upload when both file and wifi exists */
+	public boolean shouldUpload(){
+		File [] kernel_files = new File(kernel_path).listFiles();
+		File [] user_files = new File(user_path).listFiles();
+		return (((kernel_files.length !=0 ) || (user_files.length != 0)) && (mUploader.connectionAvailable() == mUploader.CONNECTION_WIFI));
 	}
 
 }

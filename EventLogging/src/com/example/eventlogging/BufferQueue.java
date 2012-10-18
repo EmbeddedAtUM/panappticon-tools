@@ -9,7 +9,7 @@ import android.util.Log;
 
 public class BufferQueue {
 	private static final String TAG = "BufferQueue";
-	private final int BUFFER_SIZE = 1024*1024;//2M
+	private final int BUFFER_SIZE = 1 * 1024*1024;//2M
 	
 	public static final int USER_MODE = 0;
 	public  static final int KERNEL_MODE = 1;
