@@ -15,9 +15,7 @@
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
-
+LOCAL_MODULE    := libget_time
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := get-time.c
-LOCAL_MODULE    := libget_time
-
 include $(BUILD_SHARED_LIBRARY)
