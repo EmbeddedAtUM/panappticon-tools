@@ -248,6 +248,8 @@ int main() {
   struct event_hdr header;
   struct timeval timestamp;
 
+  char suspended = 0;
+
   FILE* istream = stdin;
   FILE* ostream = stdout;
 
@@ -263,6 +265,17 @@ int main() {
     if (type->decoder)
       type->decoder(istream, &header, &timestamp, type->data);
 
+    /* Track if the device is currently suspended or not.  If device
+       was already suspended, drop the event, because the event timestamp may be
+       incorrect. */
+    if (header.event_type == EVENT_SUSPEND)
+      suspended = 1;
+    else if (header.event_type == EVENT_RESUME)
+      suspended = 0;
+    else
+      if (suspended)
+	continue;
+    
     fprint_json_event(ostream, &header, &timestamp, type->printer, type->data);
   }
 
