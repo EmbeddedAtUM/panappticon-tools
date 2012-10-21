@@ -6,13 +6,13 @@ int main() {
   FILE* stream = stdin; 
   FILE* ostream = stdout;
 
-  int ret;
+  int ret = 0;
   unsigned int len;
   lzo_uint uncmp_len;
   size_t remain;
 
-  char* uncompressed;
-  char* compressed;
+  unsigned char* uncompressed;
+  unsigned char* compressed;
 
   while (fread(&len, 4, 1, stream)) {
     if (ferror(stream))
