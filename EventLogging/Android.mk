@@ -18,4 +18,4 @@ LOCAL_PACKAGE_NAME := EventLogging
 
 include $(BUILD_PACKAGE)
 
-include $(call all-makefiles-under, &(LOCAL_PATH))
+include $(call all-makefiles-under, $(LOCAL_PATH))
