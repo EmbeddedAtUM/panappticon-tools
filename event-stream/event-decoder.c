@@ -3,6 +3,7 @@
 #include <time.h>
 #include <stdint.h>
 #include <endian.h>
+#include <assert.h>
 
 #include "events.h"
 
@@ -215,7 +216,7 @@ inline size_t read_next_header(struct event_hdr* header, FILE* stream) {
 #define SIGN_EXT(val, b) ((val ^ (1 << (b-1))) - (1 << (b-1)))
 
 /* Only works on little endian arch */
-static inline void read_next_timestamp(struct timeval* tv, struct event_hdr* header, FILE* stream) {
+static inline void read_next_timestamp(struct timeval* tv, struct event_hdr* header, FILE* stream, char suspended) {
   static struct timeval prev;
 
   int sec_len;
@@ -236,6 +237,13 @@ static inline void read_next_timestamp(struct timeval* tv, struct event_hdr* hea
     prev = *tv;
   }
   else {
+    /* Make sure that time hasn't gone backwards. We can figure out
+     * how to deal with it when it happens.
+     * When suspended, time can do crazy things, so ignore backwards movement.
+     */
+    if (!suspended)
+      assert(tv->tv_sec > 0 || (tv->tv_sec == 0 && tv->tv_usec >= 0) );
+
     prev.tv_sec += tv->tv_sec;
     prev.tv_usec += tv->tv_usec;
     *tv = prev;
@@ -254,7 +262,7 @@ int main() {
   FILE* ostream = stdout;
 
   while (read_next_header(&header, istream) && !feof(istream)) {
-    read_next_timestamp(&timestamp, &header, istream);
+    read_next_timestamp(&timestamp, &header, istream, suspended);
 
     type = &EVENT_TYPES[header.event_type];
     if (!type){
