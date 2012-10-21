@@ -10,12 +10,12 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
 LOCAL_SRC_FILES := \
         $(call all-java-files-under, src) 
 
+LOCAL_JNI_SHARED_LIBRARIES := libget_time
+
 LOCAL_PACKAGE_NAME := EventLogging
 
-LOCAL_PROGUARD_FLAG_FILES := proguard.flags
-
-#LOCAL_EMMA_COVERAGE_FILTER := *,-com.android.common.*
 
 
 include $(BUILD_PACKAGE)
 
+include $(call all-makefiles-under, &(LOCAL_PATH))

@@ -33,7 +33,7 @@ public class LogUploader {
 	public static final int CONNECTION_WIFI = 1;
 	public static final int CONNECTION_3G = 2;
 	
-	public static final int UPLOAD_THRESHOLD = 15*1024*1024;//10M 
+	public static final int UPLOAD_THRESHOLD = 15*1024*1024;//15M 
 	
 	private static final String SERVER_IP = "gambit.eecs.umich.edu"; 
 	private static final int SERVER_PORT = 5204;
@@ -90,8 +90,10 @@ public class LogUploader {
 		@Override
 		public void run() {
 		    int success = 1;
-		    long runID = System.currentTimeMillis();
-		    Log.i(TAG, "About to send data " + runID + " " + mLen + " "+ mMode);
+		    long runID = EventLoggingActivity.getCurrentMicroSeconds();
+		    //long runID = System.currentTimeMillis();
+		     //Log.i(TAG,"Comparison is " + runID + " " + System.currentTimeMillis());
+		     Log.i(TAG, "New about to send data " + runID + " " + mLen + " "+ mMode);
 		    
 		    for(int iter = 1; !interrupted(); iter++) {
 		    	
@@ -205,4 +207,5 @@ public class LogUploader {
 		    m.update(s.getBytes(), 0, s.length());
 		    return new BigInteger(1, m.digest()).toString(16);
 		  }
+
 }
