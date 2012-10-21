@@ -6,60 +6,206 @@
 
 #include "events.h"
 
-#define PID_MASK 0x7FFF
+typedef void (*decode_event_data)(FILE* stream, const struct event_hdr* header, const struct timeval* tv, void* data);
+typedef void (*print_event_data)(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const void* data);
 
-static const char* const event_strings[256] = {
-  [EVENT_SYNC_LOG] = "Sync",
-  [EVENT_MISSED_COUNT] = "Missed Count",
-  [EVENT_CPU_ONLINE] = "CPU Online",
-  [EVENT_CPU_DOWN_PREPARE] = "CPU Down Prepare",
-  [EVENT_CPU_DEAD] = "CPU Offline",
-  [EVENT_CPUFREQ_SET] = "Cpufreq Set",
-  [EVENT_SUSPEND_START] = "Suspend Start (to RAM)",
-  [EVENT_SUSPEND] = "Suspend (to RAM)",
-  [EVENT_RESUME] = "Resume (from RAM)",
-  [EVENT_RESUME_FINISH] = "Resume Finish (from RAM)",
-  [EVENT_WAKE_LOCK] = "Wake Lock",
-  [EVENT_WAKE_UNLOCK] = "Wake Unlock",
-  [EVENT_CONTEXT_SWITCH] = "Context Switch",
-  [EVENT_PREEMPT_TICK] = "Preempt Tick",
-  [EVENT_PREEMPT_WAKEUP] = "Preempt Wakeup",
-  [EVENT_YIELD] = "Yield",
-  [EVENT_IDLE_START] = "Idle Start",
-  [EVENT_IDLE_END] = "Idle End",
-  [EVENT_FORK] = "Fork",
-  [EVENT_THREAD_NAME] = "Thread name",
-  [EVENT_EXIT] = "Exit",
-  [EVENT_DATAGRAM_BLOCK] = "Block (datagram)",
-  [EVENT_DATAGRAM_RESUME] = "Resume (datagram)",
-  [EVENT_STREAM_BLOCK] = "Block (stream)",
-  [EVENT_STREAM_RESUME] = "Resume (stream)",
-  [EVENT_SOCK_BLOCK] = "Block (socket)",
-  [EVENT_SOCK_RESUME] = "Resume (socket)",
-  [EVENT_WAITQUEUE_WAIT] = "Wait (waitqueue)",
-  [EVENT_WAITQUEUE_WAKE] = "Wake (waitqueue)",
-  [EVENT_WAITQUEUE_NOTIFY] = "Notify (waitqueue)",
-  [EVENT_MUTEX_LOCK] = "Lock (mutex)",
-  [EVENT_MUTEX_WAIT] = "Wait (mutex)",
-  [EVENT_MUTEX_WAKE] = "Wake (mutex)",
-  [EVENT_MUTEX_NOTIFY] = "Notify (mutex)",
-  [EVENT_SEMAPHORE_LOCK] = "Lock (sem)",
-  [EVENT_SEMAPHORE_WAIT] = "Wait (sem)",
-  [EVENT_SEMAPHORE_NOTIFY] = "Notify (sem)",
-  [EVENT_SEMAPHORE_WAKE] = "Wake (sem)",
-  [EVENT_FUTEX_WAIT] = "Wait (futex)",
-  [EVENT_FUTEX_WAKE] = "Wake (futex)",
-  [EVENT_FUTEX_NOTIFY] = "Notify (futex)",
-  [EVENT_IO_BLOCK] = "Block (IO)",
-  [EVENT_IO_RESUME] = "Resume (IO)",
-  "Unknown"
-};
-
-static inline const char* event_to_str(const int type) {
-  return event_strings[type];
+/* ==================================== Event Decode and Print Functions ========================= */
+static void decode_sync_log_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct sync_log_event* data) {
+  fread(&data->magic, 8, 1, stream);
 }
 
-char* TASK_STATE[] = {"Running", "Interruptible", "Uninterruptible", "Stopped", "Traced", NULL, NULL, "Dead", "Wakekill"};
+static void print_sync_log_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct sync_log_event* data) {
+  fprintf(stream, "{\"magic\":\"%s\"}", data->magic);
+}
+
+static void decode_missed_count_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct missed_count_event* data) {
+  fread(&data->count, 4, 1, stream);
+}
+
+static void print_missed_count_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct missed_count_event* data) {
+  fprintf(stream, "{\"count\":%u}", data->count);
+}
+
+static void decode_general_lock_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct general_lock_event* data) {
+  fread(&data->lock, 4, 1, stream);
+}
+
+static void print_general_lock_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct general_lock_event* data) {
+  fprintf(stream, "{\"lock\":%u}", data->lock);
+}
+
+static void decode_general_notify_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct general_notify_event* data) {
+  fread(&data->lock, 4, 1, stream);
+  fread(&data->pid, 2, 1, stream);
+}
+
+static void print_general_notify_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct general_notify_event* data) {
+  fprintf(stream, "{\"lock\":%u,\"pid\":%u}", data->lock, data->pid);
+}
+
+static void decode_hotcpu_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct hotcpu_event* data) {
+  fread(&data->cpu, 1, 1, stream);\
+}
+
+static void print_hotcpu_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct hotcpu_event* data) {
+  fprintf(stream, "{\"cpu\":%u}", data->cpu);
+}
+
+static void decode_cpufreq_set_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct cpufreq_set_event* data) {
+  fread(&data->cpu, 1, 1, stream);
+  fread(&data->old_freq, 4, 1, stream);
+  fread(&data->new_freq, 4, 1, stream);
+}
+
+static void print_cpufreq_set_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct cpufreq_set_event* data) {
+  fprintf(stream, "{\"cpu\":%u,\"old_khz\":%u,\"new_khz\":%u}", data->cpu, data->old_freq, data->new_freq);
+}
+
+static char* TASK_STATE[] = {"R", "I", "U", "S", "T", NULL, NULL, "D", "W"};
+
+static void decode_context_switch_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct context_switch_event* data) {
+  fread(&data->new_pid, 2, 1, stream);
+  fread(&data->state, 1, 1, stream);
+}
+
+static void print_context_switch_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct context_switch_event* data) {
+  fprintf(stream, "{\"old\":%u,\"new\":%u,\"state\":\"%s\"}", header->pid, data->new_pid, TASK_STATE[data->state ? __builtin_ctz(data->state)+1 : 0]);
+}
+
+static void decode_wake_lock_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct wake_lock_event* data) {
+  fread(&data->lock, 4, 1, stream);
+  fread(&data->timeout, 4, 1, stream);
+}
+
+static void print_wake_lock_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct wake_lock_event* data) {
+  fprintf(stream, "{\"lock\":%u,\"timeout\":", data->lock);
+  if (data->timeout)
+    fprintf(stream, "%u", data->timeout);
+  else
+    fprintf(stream, "null");
+  fprintf(stream, "}");
+}
+
+static void decode_wake_unlock_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct wake_unlock_event* data) {
+  fread(&data->lock, 4, 1, stream);
+}
+
+static void print_wake_unlock_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct wake_unlock_event* data) {
+  fprintf(stream, "{\"lock\":%u}", data->lock);
+}
+
+static void decode_fork_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct fork_event* data) {
+  fread(&data->pid, 4, 1, stream);
+}
+
+static void print_fork_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct fork_event* data) {
+  fprintf(stream, "{\"pid\":%u,\"tgid\":%u}", data->pid, data->tgid);
+}						   
+
+static void decode_thread_name_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct thread_name_event* data) {
+  fread(&data->pid, 2, 1, stream);
+  fread(&data->comm, 16, 1, stream);
+}
+
+static void print_thread_name_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct thread_name_event* data) {
+  printf("{\"pid\":%u,\"name\":\"%s\"}", data->pid, data->comm);
+}
+
+/* ======================================================================================================== */
+
+#define DECLARE_TYPE_DATA(type_suffix) struct type_suffix##_event shared_##type_suffix##_event
+
+static DECLARE_TYPE_DATA(sync_log);
+static DECLARE_TYPE_DATA(missed_count);
+static DECLARE_TYPE_DATA(context_switch);
+static DECLARE_TYPE_DATA(hotcpu);
+static DECLARE_TYPE_DATA(cpufreq_set);
+static DECLARE_TYPE_DATA(wake_lock);
+static DECLARE_TYPE_DATA(wake_unlock);
+static DECLARE_TYPE_DATA(fork);
+static DECLARE_TYPE_DATA(thread_name);
+static DECLARE_TYPE_DATA(general_lock);
+static DECLARE_TYPE_DATA(general_notify);
+
+struct event_type {
+  const char* const type_json;
+  const decode_event_data decoder;
+  const print_event_data printer;
+  void* data;
+};
+
+#define INIT_TYPE(type, suffix) [EVENT_##type] = {.type_json = #type, \
+						  .decoder = (decode_event_data) decode_##suffix##_event,	\
+						  .printer = (print_event_data) print_##suffix##_event, \
+						  .data = &shared_##suffix##_event}
+
+#define INIT_TYPE_SIMPLE(type) [EVENT_##type] = {.type_json = #type, \
+					  .decoder = NULL,    \
+					  .printer = NULL,    \
+					  .data = NULL}
+
+static struct event_type EVENT_TYPES[256] = {
+  INIT_TYPE(SYNC_LOG, sync_log),
+  INIT_TYPE(MISSED_COUNT, missed_count),
+  INIT_TYPE(CPU_ONLINE, hotcpu),
+  INIT_TYPE(CPU_DOWN_PREPARE, hotcpu),
+  INIT_TYPE(CPU_DEAD, hotcpu),
+  INIT_TYPE(CPUFREQ_SET, cpufreq_set),
+  INIT_TYPE_SIMPLE(SUSPEND_START),
+  INIT_TYPE_SIMPLE(SUSPEND),
+  INIT_TYPE_SIMPLE(RESUME),
+  INIT_TYPE_SIMPLE(RESUME_FINISH),
+  INIT_TYPE(WAKE_LOCK, wake_lock),
+  INIT_TYPE(WAKE_UNLOCK, wake_unlock),
+  INIT_TYPE(CONTEXT_SWITCH, context_switch),
+  INIT_TYPE_SIMPLE(PREEMPT_TICK),
+  INIT_TYPE_SIMPLE(PREEMPT_WAKEUP),
+  INIT_TYPE_SIMPLE(YIELD),
+  INIT_TYPE_SIMPLE(IDLE_START),
+  INIT_TYPE_SIMPLE(IDLE_END),
+  INIT_TYPE(FORK, fork),
+  INIT_TYPE(THREAD_NAME, thread_name),
+  INIT_TYPE_SIMPLE(EXIT),
+  INIT_TYPE_SIMPLE(DATAGRAM_BLOCK),
+  INIT_TYPE_SIMPLE(DATAGRAM_RESUME),
+  INIT_TYPE_SIMPLE(STREAM_BLOCK),
+  INIT_TYPE_SIMPLE(STREAM_RESUME),
+  INIT_TYPE_SIMPLE(SOCK_BLOCK),
+  INIT_TYPE_SIMPLE(SOCK_RESUME),
+  INIT_TYPE_SIMPLE(IO_BLOCK),
+  INIT_TYPE_SIMPLE(IO_RESUME),
+  INIT_TYPE(WAITQUEUE_WAIT, general_lock),
+  INIT_TYPE(WAITQUEUE_WAKE, general_lock),
+  INIT_TYPE(WAITQUEUE_NOTIFY, general_notify),
+  INIT_TYPE(MUTEX_LOCK, general_lock),
+  INIT_TYPE(MUTEX_WAIT, general_lock),
+  INIT_TYPE(MUTEX_WAKE, general_lock),
+  INIT_TYPE(MUTEX_NOTIFY, general_notify),
+  INIT_TYPE(SEMAPHORE_LOCK, general_lock),
+  INIT_TYPE(SEMAPHORE_WAIT, general_lock),
+  INIT_TYPE(SEMAPHORE_WAKE, general_lock),
+  INIT_TYPE(SEMAPHORE_NOTIFY, general_notify),
+  INIT_TYPE(FUTEX_WAIT, general_lock),
+  INIT_TYPE(FUTEX_WAKE, general_lock),
+  INIT_TYPE(FUTEX_NOTIFY, general_notify)
+};
+
+#define PID_MASK 0x7FFF
+
+static void fprint_json_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, print_event_data printer, const void* data) {
+  static const char* const EVENT_JSON_START = "{\"event\":\"%s\",\"time\":{\"sec\":%u,\"usec\":%u},\"cpu\":%u,\"pid\":%u,\"irq\":%s,\"data\":";
+  static const char* const EVENT_JSON_END = "}\n";
+
+  const char* type_name = EVENT_TYPES[header->event_type].type_json;  
+  const char* irq = (0x8000 & header->pid) ? "true" : "false";
+  
+  fprintf(stream, EVENT_JSON_START, type_name, tv->tv_sec, tv->tv_usec, GET_CPU(header), header->pid & PID_MASK, irq);
+  if (printer)
+    printer(stream, header, tv, data);
+  else
+    fprintf(stream, "null");
+  fprintf(stream, EVENT_JSON_END);
+}
 
 inline size_t read_next_header(struct event_hdr* header, FILE* stream) {
   return fread(header, sizeof(*header), 1, stream);
@@ -97,165 +243,28 @@ static inline void read_next_timestamp(struct timeval* tv, struct event_hdr* hea
 
 }
 
-void print_event_common(struct event_hdr* header, struct timeval* tv) {
-  time_t time = tv->tv_sec;
-  struct tm *time_tm = localtime(&time);
-
-  char tmbuf[64], buf[64];
-  strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", time_tm);
-  snprintf(buf, sizeof buf, "%s.%06d", tmbuf, tv->tv_usec);
-
-  if (0x8000 & header->pid)
-    printf("[%s] <%d> (I %5d) %s ", buf, GET_CPU(header), header->pid & PID_MASK, event_to_str(header->event_type));
-  else
-    printf("[%s] <%d> (%7d) %s ", buf, GET_CPU(header), header->pid & PID_MASK, event_to_str(header->event_type));
-}
-
-void process_simple_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  printf("\n");
-}
-
-void process_general_lock_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct general_lock_event event;
-  fread(&event.lock, 4, 1, stream);
-  printf(" [%0x]\n", event.lock);
-}
-
-void process_general_notify_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct general_notify_event event;
-  fread(&event.lock, 4, 1, stream);
-  fread(&event.pid, 2, 1, stream);
-  printf(" [%0x] pid: %d\n", event.lock, event.pid);
-}
-
-void process_sync_log_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct sync_log_event event;
-  fread(&event.magic, 8, 1, stream);
-  printf(" %8s\n", event.magic);
-}
-
-void process_missed_count_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct missed_count_event event;
-  fread(&event.count, 4, 1, stdin);
-  printf(" %d\n", event.count);
-}
-
-void process_hotcpu_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct hotcpu_event event;
-  fread(&event.cpu, 1, 1, stdin);
-  printf(": %d\n", event.cpu);
-}
-
-void process_cpufreq_set_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct cpufreq_set_event event;
-  fread(&event.cpu, 1, 1, stream);
-  fread(&event.old_freq, 4, 1, stream);
-  fread(&event.new_freq, 4, 1, stream);
-  printf(": [CPU %d] %d -> %d\n", event.cpu, event.old_freq, event.new_freq);
-}
-
-void process_context_switch_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct context_switch_event event;
-  fread(&event.new_pid, 2, 1, stdin);
-  fread(&event.state, 1, 1, stdin);
-  printf("%5d => %5d (%s)\n", header->pid, event.new_pid, TASK_STATE[event.state ? __builtin_ctz(event.state)+1 : 0]);
-}
-
-void process_wake_lock_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct wake_lock_event event;
-  fread(&event.lock, 4, 1, stdin);
-  fread(&event.timeout, 4, 1, stdin);
-  printf("[%x]", event.lock);
-  if (event.timeout != 0)
-    printf(" (%d)", event.timeout);
-  printf("\n");
-}
-
-void process_wake_unlock_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct wake_unlock_event event;
-  fread(&event.lock, 4, 1, stdin);
-  printf("[%x]\n", event.lock);
-}
-
-void process_fork_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct fork_event event;
-  fread(&event.pid, 4, 1, stdin);
-  printf("pid:%d tgid:%d\n", event.pid, event.tgid);
-}						   
-
-void process_thread_name_event(FILE* stream, struct event_hdr* header, struct timeval* tv) {
-  struct thread_name_event event;
-  fread(&event.pid, 2, 1, stdin);
-  fread(&event.comm, 16, 1, stdin);
-  printf("%d=>\"%s\"\n", event.pid, event.comm);
-}
-
-typedef void (*decode_event_func)(FILE* stream, struct event_hdr* header, struct timeval* tv);
-
-static decode_event_func decoders[256] = {
-  [EVENT_SYNC_LOG]		= process_sync_log_event,
-  [EVENT_MISSED_COUNT]		= process_missed_count_event,
-  [EVENT_CPU_ONLINE]		= process_hotcpu_event,
-  [EVENT_CPU_DOWN_PREPARE]	= process_hotcpu_event,
-  [EVENT_CPU_DEAD]		= process_hotcpu_event,
-  [EVENT_CPUFREQ_SET]           = process_cpufreq_set_event,
-  [EVENT_THREAD_NAME]		= process_thread_name_event,
-  [EVENT_CONTEXT_SWITCH]	= process_context_switch_event,
-  [EVENT_WAKE_LOCK]		= process_wake_lock_event,
-  [EVENT_WAKE_UNLOCK]		= process_wake_unlock_event,
-  [EVENT_FORK]			= process_fork_event,
-  [EVENT_WAITQUEUE_WAIT]	= process_general_lock_event,
-  [EVENT_WAITQUEUE_WAKE]	= process_general_lock_event,
-  [EVENT_MUTEX_LOCK]		= process_general_lock_event,
-  [EVENT_MUTEX_WAIT]		= process_general_lock_event,
-  [EVENT_MUTEX_WAKE]		= process_general_lock_event,
-  [EVENT_SEMAPHORE_LOCK]	= process_general_lock_event,
-  [EVENT_SEMAPHORE_WAIT]	= process_general_lock_event,
-  [EVENT_SEMAPHORE_WAKE]	= process_general_lock_event,
-  [EVENT_FUTEX_WAIT]		= process_general_lock_event,
-  [EVENT_FUTEX_WAKE]		= process_general_lock_event,
-  [EVENT_WAITQUEUE_NOTIFY]	= process_general_notify_event,
-  [EVENT_MUTEX_NOTIFY]		= process_general_notify_event,
-  [EVENT_SEMAPHORE_NOTIFY]	= process_general_notify_event,
-  [EVENT_FUTEX_NOTIFY]		= process_general_notify_event,
-  [EVENT_EXIT]			= process_simple_event,
-  [EVENT_PREEMPT_TICK]		= process_simple_event,
-  [EVENT_PREEMPT_WAKEUP]	= process_simple_event,
-  [EVENT_YIELD]			= process_simple_event,
-  [EVENT_SUSPEND_START]		= process_simple_event,
-  [EVENT_SUSPEND]		= process_simple_event,
-  [EVENT_RESUME]		= process_simple_event,
-  [EVENT_RESUME_FINISH]		= process_simple_event,
-  [EVENT_IDLE_START]		= process_simple_event,
-  [EVENT_IDLE_END]		= process_simple_event,
-  [EVENT_DATAGRAM_BLOCK]	= process_simple_event,
-  [EVENT_DATAGRAM_RESUME]	= process_simple_event,
-  [EVENT_STREAM_BLOCK]		= process_simple_event,
-  [EVENT_STREAM_RESUME]		= process_simple_event,
-  [EVENT_SOCK_BLOCK]		= process_simple_event,
-  [EVENT_SOCK_RESUME]		= process_simple_event,
-  [EVENT_IO_BLOCK]		= process_simple_event,
-  [EVENT_IO_RESUME]		= process_simple_event,
-  NULL
-};
-
 int main() {
-  decode_event_func decoder;
+  struct event_type* type;
   struct event_hdr header;
   struct timeval timestamp;
 
-  FILE* stream = stdin;
+  FILE* istream = stdin;
+  FILE* ostream = stdout;
 
-  while (read_next_header(&header, stream) && !feof(stream)) {
-    read_next_timestamp(&timestamp, &header, stdin);
-    print_event_common(&header, &timestamp);
-    
-    decoder = decoders[header.event_type];
-    if (!decoder) {
-      fprintf(stderr, "Unknown event type received: %d\n", header.event_type);
+  while (read_next_header(&header, istream) && !feof(istream)) {
+    read_next_timestamp(&timestamp, &header, istream);
+
+    type = &EVENT_TYPES[header.event_type];
+    if (!type){
+      fprintf(stderr, "Unknown event type received: %u\n", header.event_type);
       exit(1);
     }
+      
+    if (type->decoder)
+      type->decoder(istream, &header, &timestamp, type->data);
 
-    decoder(stream, &header, &timestamp);
+    fprint_json_event(ostream, &header, &timestamp, type->printer, type->data);
   }
- }
+
+  return 0;
+}
