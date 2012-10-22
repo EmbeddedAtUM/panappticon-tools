@@ -8,6 +8,7 @@ LOCAL_STATIC_JAVA_LIBRARIES := \
         android-support-v13 \
         android-support-v4
 LOCAL_JNI_SHARED_LIBRARIES := libget_time
+LOCAL_REQUIRED_MODULES := libget_time
 LOCAL_CERTIFICATE := platform
 include $(BUILD_PACKAGE)
 
