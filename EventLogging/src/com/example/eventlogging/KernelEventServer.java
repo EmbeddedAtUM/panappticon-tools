@@ -65,9 +65,26 @@ public class KernelEventServer extends Thread{
 		return queue;
 	}*/
 
+	private void restartRead() {
+		FileOutputStream fwriter = null;
+		Log.d(TAG, "Kernel reset read");
+		try {
+			fwriter = new FileOutputStream(PROC_FILE);
+			fwriter.write("restart".getBytes());
+			fwriter.close();
+		} catch (FileNotFoundException e)  {
+			Log.e(TAG, "Failed to open proc file", e);
+		} catch (IOException e) {
+			Log.e(TAG, "Failed to write to proc file", e);
+		}
+	}
+
 	public void run() {
 		FileInputStream freader = null;
 		Log.d("Lide", "Kernel server reads");
+
+		restartRead();
+
 		try {
 			freader = new FileInputStream(PROC_FILE);
 			Log.d("Lide", "Kernel server starts read");
