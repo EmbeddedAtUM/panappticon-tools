@@ -104,6 +104,12 @@ public class ServerService extends Service{
 		}
 		
 	};
+   static {
+	System.loadLibrary("get_time");
+   }    
+   
+    public static native long  getCurrentMicroSeconds();
+    
     public class LocalBinder extends Binder {
         ServerService getService() {
             return ServerService.this;

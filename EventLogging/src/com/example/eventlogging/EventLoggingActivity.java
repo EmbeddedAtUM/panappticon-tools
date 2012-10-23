@@ -104,9 +104,4 @@ public class EventLoggingActivity extends Activity {
     	}
     }
     
-   static {
-	System.loadLibrary("get_time");
-   }    
-    
-   public static native long  getCurrentMicroSeconds();
 }

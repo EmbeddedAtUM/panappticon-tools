@@ -3,6 +3,7 @@ package com.example.eventlogging;
 import java.nio.ByteBuffer;
 import java.util.Queue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.EventLogging;
 
 import android.content.Context;
 import android.util.Log;

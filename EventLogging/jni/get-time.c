@@ -2,7 +2,7 @@
 #include <sys/time.h>
 
 
-jlong Java_com_example_eventlogging_EventLoggingActivity_getCurrentMicroSeconds(JNIEnv* env,
+jlong Java_com_example_eventlogging_ServerService_getCurrentMicroSeconds(JNIEnv* env,
                                                   jobject thiz )
 {
 	struct timeval time1;

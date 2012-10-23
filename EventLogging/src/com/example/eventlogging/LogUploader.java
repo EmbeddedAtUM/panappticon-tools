@@ -90,7 +90,7 @@ public class LogUploader {
 		@Override
 		public void run() {
 		    int success = 1;
-		    long runID = EventLoggingActivity.getCurrentMicroSeconds();
+		    long runID = ServerService.getCurrentMicroSeconds();
 		    //long runID = System.currentTimeMillis();
 		     //Log.i(TAG,"Comparison is " + runID + " " + System.currentTimeMillis());
 		     Log.i(TAG, "New about to send data " + runID + " " + mLen + " "+ mMode);
