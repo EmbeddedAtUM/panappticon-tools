@@ -82,6 +82,8 @@ public class BufferQueue {
 	}
 
 	public void export(int index){//Upload the current queue when Wifi available, otherwise write to file
+		EventLogging eventlogging = EventLogging.getInstance();
+		eventlogging.onPauseExport();
 		LinkedBlockingQueue<UnitBuffer> target = mQueues[index];
 		UnitBuffer tmp = target.poll();
 		while(tmp!=null){
