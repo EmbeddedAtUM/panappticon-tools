@@ -45,8 +45,8 @@ public class EventLoggingTestActivity extends Activity {
         new Button.OnClickListener() {
           public void onClick(View v) {
             mThreadStartButton.setEnabled(false);
-            mThreadStartButton.setText("CPU exerciser working!");
-            mThreadStartButton.setBackgroundColor(Color.RED);
+            //mThreadStartButton.setText("CPU exerciser working!");
+            //mThreadStartButton.setBackgroundColor(Color.RED);
             Thread t1 = new Thread(mCpuExerciser);
             t1.start();
             mThreadStartButton.setEnabled(true);

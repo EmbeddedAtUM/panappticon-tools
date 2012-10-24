@@ -52,9 +52,11 @@ void print_event_json(event cur, FILE* outstream)
 	long timestamp = cur.timestamp;
 	int event_type = cur.event_type;
 	int pid = cur.pid;
-	const char* json_start = "{\"event\":\"%s\",\"time\":%ld,\"pid\":%d,\"data\":";
+	const char* json_start = "{\"event\":\"%s\",\"time\":{\"sec\":%d,\"usec\":%d},\"pid\":%d,\"data\":";
 	const char* json_end = "}\n";
-	fprintf(outstream, json_start, event_types[event_type], timestamp, pid);
+	int sec = timestamp/1e6;
+	int usec = timestamp - sec*1e6;
+	fprintf(outstream, json_start, event_types[event_type], sec, usec, pid);
 	switch(event_type)
 	{
 		case MSG_ENQUEUE:
