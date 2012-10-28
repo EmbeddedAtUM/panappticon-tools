@@ -175,7 +175,7 @@ def decode_event(encoded):
         "SYNC_LOG" : SyncLogEvent,
         "MISSED_COUNT" : MissedCountEvent,
         "CPU_ONLINE" : HotCpuEvent,
-        "CPU_DOWN_PREPRE" : HotCpuEvent,
+        "CPU_DOWN_PREPARE" : HotCpuEvent,
         "CPU_DEAD" : HotCpuEvent,
         "CPUFREQ_SET" : CpuFreqSetEvent,
         "BINDER_PRODUCE_ONEWAY" : BinderEvent,
