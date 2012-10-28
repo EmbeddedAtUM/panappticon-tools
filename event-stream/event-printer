@@ -72,6 +72,15 @@ class HotCpuEvent(Event):
         header = super(HotCpuEvent, self).__str__()
         return "%s: %d"%(header, self.hot_cpu)
 
+class BinderEvent(Event):
+    def __init__(self, data):
+        super(BinderEvent, self).__init__(data)
+        self.transaction = self.data['trans']
+
+    def __str__(self):
+        header = super(HotCpuEvent, self).__str__()
+        return "%s: %0x"%(header, self.transaction)
+
 class  CpuFreqSetEvent(Event):
     def __init__(self, data):
         super(CpuFreqSetEvent, self).__init__(data)
@@ -169,6 +178,10 @@ def decode_event(encoded):
         "CPU_DOWN_PREPRE" : HotCpuEvent,
         "CPU_DEAD" : HotCpuEvent,
         "CPUFREQ_SET" : CpuFreqSetEvent,
+        "BINDER_PRODUCE_ONEWAY" : BinderEvent,
+        "BINDER_PRODUCE_TWOWAY" : BinderEvent,
+        "BINDER_PRODUCE_REPLY" : BinderEvent,
+        "BINDER_CONSUME" : BinderEvent,
         "SUSPEND_START" : Event,
         "SUSPEND" : Event,
         "RESUME" : Event,
