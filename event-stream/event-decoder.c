@@ -52,6 +52,14 @@ static void print_hotcpu_event(FILE* stream, const struct event_hdr* header, con
   fprintf(stream, "{\"cpu\":%u}", data->cpu);
 }
 
+static void decode_binder_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct binder_event* data) {
+  fread(&data->transaction, 4, 1, stream);
+}
+
+static void print_binder_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct binder_event* data) {
+  fprintf(stream, "{\"trans\":%u}", data->transaction);
+}
+
 static void decode_cpufreq_set_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct cpufreq_set_event* data) {
   fread(&data->cpu, 1, 1, stream);
   fread(&data->old_freq, 4, 1, stream);
@@ -127,6 +135,7 @@ static DECLARE_TYPE_DATA(fork);
 static DECLARE_TYPE_DATA(thread_name);
 static DECLARE_TYPE_DATA(general_lock);
 static DECLARE_TYPE_DATA(general_notify);
+static DECLARE_TYPE_DATA(binder);
 
 struct event_type {
   const char* const type_json;
@@ -152,6 +161,10 @@ static struct event_type EVENT_TYPES[256] = {
   INIT_TYPE(CPU_DOWN_PREPARE, hotcpu),
   INIT_TYPE(CPU_DEAD, hotcpu),
   INIT_TYPE(CPUFREQ_SET, cpufreq_set),
+  INIT_TYPE(BINDER_PRODUCE_ONEWAY, binder),
+  INIT_TYPE(BINDER_PRODUCE_TWOWAY, binder),
+  INIT_TYPE(BINDER_PRODUCE_REPLY, binder),
+  INIT_TYPE(BINDER_CONSUME, binder),
   INIT_TYPE_SIMPLE(SUSPEND_START),
   INIT_TYPE_SIMPLE(SUSPEND),
   INIT_TYPE_SIMPLE(RESUME),
