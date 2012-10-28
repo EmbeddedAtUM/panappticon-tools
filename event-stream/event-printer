@@ -78,7 +78,7 @@ class BinderEvent(Event):
         self.transaction = self.data['trans']
 
     def __str__(self):
-        header = super(HotCpuEvent, self).__str__()
+        header = super(BinderEvent, self).__str__()
         return "%s: %0x"%(header, self.transaction)
 
 class  CpuFreqSetEvent(Event):
