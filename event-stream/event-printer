@@ -169,6 +169,54 @@ class ContextSwitchEvent(Event):
         header = super(ContextSwitchEvent, self).__str__()
         return "%s: %5d => %5d (%s)"%(header, self.old_pid, self.new_pid, self.state_map[self.state])
 
+# Userspace Events
+class MessageQueueEvent(Event):
+    def __init__(self, data):
+        super(MessageEnqueueEvent, self).__init__(data)
+        self.message_id = self.data['mid']
+        self.queue_id = self.data['qid']
+        
+    def __str__(self):
+        header = super(MessageQueueEvent, self).__str__()
+        return "%s: Queue: %3d Message: %3d"%(header, self.message_id, self.queue_id)
+
+    
+class MessageQueueDelayEvent(Event):
+    def __init__(self, data):
+        super(MessageEnqueueDelayEvent, self).__init__(data)
+        self.delay = self.data['delay']
+        
+    def __str__(self):
+        header = super(MessageQueueDelayEvent, self).__str__()
+        return "%s: %d"%(header, self.delay)
+
+class ExecutorEvent(Event):
+    def __init__(self, data):
+        super(ExecutorEvent, self).__init__(data)
+        self.runnable = self.data['runnable']
+        
+    def __str__(self):
+        header = super(ExecutorEvent, self).__str__()
+        return "%s: %0x"%(header, self.runnable)
+
+class SwitchConfigEvent(Event):
+    def __init__(self, data):
+        super(SwitchConfigEvent, self).__init__(data)
+        self.core = self.data['core']
+        self.dvfs = self.data['DVFS']
+        
+    def __str__(self):
+        header = super(SwitchConfigEvent, self).__str__()
+        return "%s: Core: %s DVFS: %s"%(header, self.core, self.dvfs)
+
+class UserspaceTagEvent(Event):
+    def __init__(self, data):
+        super(UserspaceTagEvent, self).__init__(data)
+    
+    def __str__(self):
+        header = super(UserspaceTagEvent, self).__str__()
+        return "%s"%(header)
+
 def decode_event(encoded):
     data = json.loads(encoded)
     return {
@@ -218,7 +266,23 @@ def decode_event(encoded):
         "SEMAPHORE_NOTIFY" : GeneralNotifyEvent,
         "FUTEX_WAIT" : GeneralLockEvent,
         "FUTEX_WAKE" : GeneralLockEvent,
-        "FUTEX_NOTIFY" : GeneralNotifyEvent
+        "FUTEX_NOTIFY" : GeneralNotifyEvent,
+        "MSG_ENQUEUE" : MessageQueueEvent,
+        "MSG_DEQUEUE" : MessageQueueEvent,
+        "MSG_ENQUEUE_DELAY" : MessageQueueDelayEvent,
+        "SUBMIT_ASYNC" : ExecutorEvent,
+        "CONSUME_ASYNC" : ExecutorEvent,
+        "SWITCH_CONFIG" : SwitchConfigEvent,
+        "UI_UPDATE" : UserspaceTagEvent,
+        "UI_INPUT" : UserspaceTagEvent,
+        "ENTER_FOREGROUND" : UserspaceTagEvent,
+        "EXIT_FOREGROUND" : UserspaceTagEvent,
+        "UPLOAD_TRACE" : UserspaceTagEvent,
+        "UPLOAD_DONE" : UserspaceTagEvent,
+        "WRITE_TRACE" : UserspaceTagEvent,
+        "WRITE_DONE" : UserspaceTagEvent,
+        "MSG_POLL_NATIVE" : UserspaceTagEvent,
+        "MSG_POLL_DONE" : UserspaceTagEvent
         }[data['event']](data)
 
 def main(istream, ostream):
