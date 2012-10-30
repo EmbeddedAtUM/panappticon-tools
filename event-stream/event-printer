@@ -170,7 +170,28 @@ class ContextSwitchEvent(Event):
         return "%s: %5d => %5d (%s)"%(header, self.old_pid, self.new_pid, self.state_map[self.state])
 
 # Userspace Events
-class MessageQueueEvent(Event):
+class Event(object):
+    def __init__(self, data):
+        self.timestamp = dt.datetime.fromtimestamp(data['time']['sec']).replace(microsecond=data['time']['usec'])
+        self.cpu = data['cpu'] #no
+        self.pid = data['pid'] #yes
+        self.irq = data['irq'] #no
+        self.event = data['event']
+        self.data = data['data']
+
+    def __str__(self):
+        return "[%s] <%s> (%7s) %16s"%(format_timestamp(self.timestamp),
+                                     self.cpu,
+                                     "I %5s"%self.pid if self.irq else self.pid,
+                                     self.event.replace('_',' ').capitalize())
+
+class UserspaceEvent(Event):
+    def __init__(self, data):
+        data['cpu'] = -1
+        data['irq'] = False
+        super(UserspaceEvent, self).__init__(data)
+
+class MessageQueueEvent(UserspaceEvent):
     def __init__(self, data):
         super(MessageEnqueueEvent, self).__init__(data)
         self.message_id = self.data['mid']
@@ -181,7 +202,7 @@ class MessageQueueEvent(Event):
         return "%s: Queue: %3d Message: %3d"%(header, self.message_id, self.queue_id)
 
     
-class MessageQueueDelayEvent(Event):
+class MessageQueueDelayEvent(UserspaceEvent):
     def __init__(self, data):
         super(MessageEnqueueDelayEvent, self).__init__(data)
         self.delay = self.data['delay']
@@ -190,7 +211,7 @@ class MessageQueueDelayEvent(Event):
         header = super(MessageQueueDelayEvent, self).__str__()
         return "%s: %d"%(header, self.delay)
 
-class ExecutorEvent(Event):
+class ExecutorEvent(UserspaceEvent):
     def __init__(self, data):
         super(ExecutorEvent, self).__init__(data)
         self.runnable = self.data['runnable']
@@ -199,7 +220,7 @@ class ExecutorEvent(Event):
         header = super(ExecutorEvent, self).__str__()
         return "%s: %0x"%(header, self.runnable)
 
-class SwitchConfigEvent(Event):
+class SwitchConfigEvent(UserspaceEvent):
     def __init__(self, data):
         super(SwitchConfigEvent, self).__init__(data)
         self.core = self.data['core']
@@ -209,7 +230,7 @@ class SwitchConfigEvent(Event):
         header = super(SwitchConfigEvent, self).__str__()
         return "%s: Core: %s DVFS: %s"%(header, self.core, self.dvfs)
 
-class UserspaceTagEvent(Event):
+class UserspaceTagEvent(UserspaceEvent):
     def __init__(self, data):
         super(UserspaceTagEvent, self).__init__(data)
     
