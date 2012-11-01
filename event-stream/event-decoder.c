@@ -7,9 +7,6 @@
 
 #include "events.h"
 
-/* Drop 10 seconds of events when time moves backwards */
-#define DROP_DURATION_S 10 
-
 typedef void (*decode_event_data)(FILE* stream, const struct event_hdr* header, const struct timeval* tv, void* data);
 typedef void (*print_event_data)(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const void* data);
 
@@ -232,7 +229,7 @@ inline size_t read_next_header(struct event_hdr* header, FILE* stream) {
 #define SIGN_EXT(val, b) ((val ^ (1 << (b-1))) - (1 << (b-1)))
 
 /* Only works on little endian arch */
-static inline void read_next_timestamp(struct timeval* tv, struct event_hdr* header, FILE* stream, char suspended, char* backwards) {
+static inline void read_next_timestamp(struct timeval* tv, struct event_hdr* header, FILE* stream, char suspended) {
   static struct timeval prev;
 
   int sec_len;
@@ -253,28 +250,11 @@ static inline void read_next_timestamp(struct timeval* tv, struct event_hdr* hea
     prev = *tv;
   }
   else {
-    /* If time has moved backwards, drop the next 10 seconds of events */
-    if (!suspended && (tv->tv_sec < 0 || (tv->tv_sec == 0 && tv->tv_usec < 0)))
-      *backwards = 1;
-    else
-      *backwards = 0;
-
     prev.tv_sec += tv->tv_sec;
     prev.tv_usec += tv->tv_usec;
     *tv = prev;
   }
 
-}
-
-int is_after(struct timeval* time, struct timeval* deadline) {
-  if (time->tv_sec > deadline->tv_sec)
-    return 1;
-  else if (time->tv_sec < deadline->tv_sec)
-    return 0;
-  else if (time->tv_usec > deadline->tv_usec)
-    return 1;
-  else
-    return 0;
 }
 
 int main() {
@@ -284,25 +264,11 @@ int main() {
 
   char suspended = 0;
 
-  char dropping = 0;
-  int dropped = 0;
-  char backwards = 0;
-  struct timeval resume_time = {0,0};
-
   FILE* istream = stdin;
   FILE* ostream = stdout;
 
   while (read_next_header(&header, istream) && !feof(istream)) {
-    read_next_timestamp(&timestamp, &header, istream, suspended | dropping, &backwards);
-    
-    if (dropping && is_after(&timestamp, &resume_time)) {
-      dropping = 0;
-    } else if (!dropping && backwards) {
-      dropping = 1;
-      dropped = 0;
-      resume_time = timestamp;
-      resume_time.tv_sec += DROP_DURATION_S;
-    }
+    read_next_timestamp(&timestamp, &header, istream, suspended);
 
     type = &EVENT_TYPES[header.event_type];
     if (!type){
@@ -323,15 +289,8 @@ int main() {
     else
       if (suspended)
 	continue;
-
-    if (!dropping) {
-      /* Drop the early boot events */
-      if (timestamp.tv_sec > 1000000)
-	fprint_json_event(ostream, &header, &timestamp, type->printer, type->data);
-    }
-    else {
-      dropped++;
-    }
+    
+    fprint_json_event(ostream, &header, &timestamp, type->printer, type->data);
   }
 
   return 0;
