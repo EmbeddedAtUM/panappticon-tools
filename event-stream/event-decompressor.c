@@ -1,10 +1,29 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include "minilzo/minilzo.h"
 
-int main() {
+struct globalArgs_t {
+  int singleBuffer;  /* -1 option */
+  int ignoreExtra;   /* -I option */
+} globalArgs;
+
+static const char *optString = "1I";
+
+void display_usage( void ) {
+  fputs("Usage: event-decompressor -1I\n", stderr);
+  fputs("Decompresses a kernel event stream. Reads from stdin and writes to stdout.\n", stderr);
+  fputs("Options:\n", stderr);
+  fputs("  -1      process only the first buffer in the stream\n", stderr);
+  fputs("  -I      ignore extra data after first buffer, if -1 is specified.\n", stderr);
+  exit(EXIT_FAILURE);
+}
+
+int main(int argc, char *argv[]) {
   FILE* stream = stdin; 
   FILE* ostream = stdout;
+
+  int opt = 0;
 
   int ret = 0;
   unsigned int len;
@@ -13,6 +32,29 @@ int main() {
 
   unsigned char* uncompressed;
   unsigned char* compressed;
+
+  globalArgs.singleBuffer = 0; /* false */
+  globalArgs.ignoreExtra = 0; /* false */
+
+  opt = getopt(argc, argv, optString);
+  while (opt != -1) {
+    switch (opt) {
+    case '1':
+      globalArgs.singleBuffer = 1; /* true */
+      break;
+    case 'I':
+      globalArgs.ignoreExtra = 1; /* true */
+      break;
+    case '?':
+      display_usage();
+      break;
+    default:
+      /* Can't get here */
+      break;
+    }
+
+    opt = getopt(argc, argv, optString);
+  }
 
   while (fread(&len, 4, 1, stream)) {
     if (ferror(stream))
@@ -56,6 +98,14 @@ int main() {
 
     free(uncompressed);
     uncompressed = NULL;
+
+    if (globalArgs.singleBuffer) {
+      fread(&len, 1, 1, stream);
+      if (!feof(stream) && !globalArgs.ignoreExtra)
+	fputs("warning: stopping after first buffer in stream.\n", stderr);
+      return 0;
+    }
+
   }
 
   return 0;
