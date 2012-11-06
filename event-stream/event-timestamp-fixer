@@ -1,0 +1,152 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+
+import datetime as dt
+import itertools as it
+import operator as op
+
+from collections import namedtuple
+
+try:
+    import ujson as json
+except:
+    import json
+
+Event = namedtuple('Event', ['raw', 'json', 'timestamp'])
+Timestamp = namedtuple('Timestamp', ['sec', 'usec'])
+
+
+EARLIEST_TIME = Timestamp(1000, 0)
+BOOT_OFFSET_USEC = 1000
+DROP_DURATION = 10
+
+DROP_EVENT_JSON='{}"event":"%s","time":{"sec":"%d","usec":"%d"}"count":"%d"'
+
+# Iterable helper functions
+#
+def withprev(iterable):
+    "s -> (s0, None), (s1, s0), (s2, s1), ..."
+    a, b = it.tee(iterable)
+    first = [(next(a), None)]
+    return it.chain(first, it.izip(a,b))
+
+def decorate(iterable, func):
+    "s,f -> (s0, f(s0), (s1, f(s1), (s2, f(s2), ..."
+    a, b = it.tee(iterable)
+    return it.izip(a, it.imap(func, *iunzip(b)))
+
+def iunzip(iterable):
+    """Iunzip is the same as zip(*iter) but returns iterators, instead of 
+    expand the iterator. Mostly used for large sequence.
+
+    From: https://gist.github.com/1063340
+    """
+
+    _tmp, iterable = it.tee(iterable, 2)
+    iters = it.tee(iterable, len(_tmp.next()))
+    return (it.imap(op.itemgetter(i), iterator) for i, iterator in enumerate(iters))
+
+# Event helper methods
+#
+def get_timestamp(event_json):
+    time = event_json['time']
+    return Timestamp(time['sec'], time['usec'])
+
+def add_timestamp(timestamp, secs, usecs=0):
+    carry, new_usecs = divmod(timestamp.usec + usecs, 1000000)
+    new_secs = timestamp.sec + secs + carry
+    return Timestamp(new_secs, new_usecs)
+
+def is_before(timestamp, deadline):
+    return timestamp.sec < deadline.sec or (timestamp.sec == deadline.sec and timestamp.usec < deadline.usec)
+
+def is_after(timestamp, deadline):
+    return timestamp.sec > deadline.sec or (timestamp.sec == deadline.sec and timestamp.usec > deadline.usec)
+
+def is_backwards(second, first):
+    return first != None and is_after(first, second)
+
+def event_is_backwards(second, first):
+    return first != None and is_backwards(second.timestamp, first.timestamp)
+
+def event(line):
+    data = json.loads(line)
+    return Event(line, data, get_timestamp(data))
+
+# Implemenation
+def events(iterable):
+    "map stream of json events to Event named tuples"
+    return it.imap(event, iterable)
+
+def filter_backwards(iterable):
+    # Decorate each event with boolean indicating if the event time is before the the prior event
+    decorated = decorate(withprev(iterable), event_is_backwards) 
+    
+    # Drops all events before the first event whose time is after the specified time.
+    # Returns the number of dropped events
+    def drop(iterable, resume_time):
+        dropped = 0
+        while True:
+            (event, prev), backwards = next(iterable)
+            if is_after(event.timestamp, resume_time):
+                return dropped, event
+            else:
+                dropped += 1
+
+    for (event, prev), backwards in decorated:
+        if (backwards):
+            dropped, event = drop(decorated, add_timestamp(event.timestamp, DROP_DURATION))
+            print("info: dropped %d events after time moved backwards"%dropped, file=sys.stderr)
+            # TODO: yield event containing number of dropped events
+        yield event
+
+# Fix boot timestamps
+#
+
+def fix_timestamps(events, delta_sec, delta_usec):
+    for event in events:
+        new_timestamp = add_timestamp(event.timestamp, delta_sec, delta_usec)
+        new_json = event.json
+        new_json['time']['sec'] = new_timestamp.sec
+        new_json['time']['usec'] = new_timestamp.usec
+        new_raw = json.dumps(new_json) + '\n'
+        
+        event = Event(raw=new_raw, json=new_json, timestamp=new_timestamp)
+        yield event
+
+def fix_boot_timestamps(iterable):
+    events = []
+    
+    prev_event = None
+    cnt = 0
+    while True:
+        event = next(iterable)
+        if is_before(event.timestamp, EARLIEST_TIME):
+            cnt += 1
+            events.append(event)
+            prev_event = event
+        else:
+            break
+
+    if prev_event != None:
+        print("info: corrected timestamp on %d early boot events"%cnt, file=sys.stderr)
+        delta_sec = event.timestamp.sec - prev_event.timestamp.sec
+        delta_usec = event.timestamp.usec - prev_event.timestamp.usec - BOOT_OFFSET_USEC 
+    else:
+        delta_sec = 0
+        delta_usec = 0
+
+    return it.chain(fix_timestamps(events, delta_sec, delta_usec), [event], iterable)
+
+def main(istream, ostream):
+    for event in fix_boot_timestamps(filter_backwards(events(istream))):
+        print(event.raw, end='', file=ostream)
+
+if __name__ == "__main__":
+    import sys
+
+    istream = sys.stdin
+    ostream = sys.stdout
+
+    main(istream, ostream)
