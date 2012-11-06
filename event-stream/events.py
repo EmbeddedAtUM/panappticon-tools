@@ -58,7 +58,7 @@ class MissedCountEvent(Event):
         self.count = self.data['count']
 
     def __str__(self):
-        header = super(SyncLogEvent, self).__str__()
+        header = super(MissedCountEvent, self).__str__()
         return "%s: %d"%(header, self.count)
 
 class HotCpuEvent(Event):
