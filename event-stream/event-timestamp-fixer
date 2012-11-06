@@ -71,7 +71,7 @@ def event_is_backwards(second, first):
     return first != None and is_backwards(second.timestamp, first.timestamp)
 
 def event(line):
-    data = json.loads(line)
+    data = json.loads(line.strip())
     return Event(line, data, get_timestamp(data))
 
 # Implemenation
