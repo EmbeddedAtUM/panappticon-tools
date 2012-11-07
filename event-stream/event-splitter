@@ -1,0 +1,46 @@
+#!/usr/bin/env python
+
+import datetime as dt
+import gzip
+import os
+import time
+
+try:
+    import ujson as json
+except:
+    import json
+
+def parse_date(seconds):
+    return dt.datetime.utcfromtimestamp(int(seconds))
+
+def filename_from_date(path, date):
+    TEMPLATE = '%s.json.gz'
+    return os.path.join(path, TEMPLATE%(date.strftime('%Y-%m-%d')))
+
+FILENAME = ''
+FILE = None
+
+def get_file(path, date):
+    global FILENAME
+    global FILE
+    key = filename_from_date(path, date)
+    if FILENAME != key:
+        if (FILE != None):
+            FILE.close()
+        FILENAME = key
+        FILE = gzip.open(key, 'ab')
+    return FILE
+
+def main(path, istream):
+    for event in istream:
+        decoded = json.loads(event)
+        date = parse_date(decoded['time']['sec'])
+        get_file(path, date).write(event)
+
+if __name__ == "__main__":
+    import sys
+
+    istream = sys.stdin
+    path = sys.argv[1]
+
+    main(path, istream)
