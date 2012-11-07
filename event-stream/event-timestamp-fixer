@@ -17,9 +17,10 @@ Event = namedtuple('Event', ['raw', 'json', 'timestamp'])
 Timestamp = namedtuple('Timestamp', ['sec', 'usec'])
 
 
-EARLIEST_TIME = Timestamp(1000, 0)
-BOOT_OFFSET_USEC = 1000
-DROP_DURATION = 10
+EARLIEST_TIME = Timestamp(1300000000, 0) # March 13 2011
+MAX_SKIP_INTERVAL = 10 # More than 10 seconds between boot events is considered a clock jump
+BOOT_OFFSET_USEC = 1000  # Assume 1000 usecs actually elapsed during a clock jump
+DROP_DURATION = 10 # Drop the following 10 seconds of data after the clock moves backwards
 
 DROP_EVENT_JSON='{}"event":"%s","time":{"sec":"%d","usec":"%d"}"count":"%d"'
 
@@ -105,32 +106,45 @@ def filter_backwards(iterable):
 #
 
 def fix_timestamps(events, delta_sec, delta_usec):
-    for event in events:
+    fixed_events = []
+    for event, dsec, dusec in reversed(events):
+        if (dsec != None):
+            delta_sec += dsec
+            delta_usec += dusec
+
         new_timestamp = add_timestamp(event.timestamp, delta_sec, delta_usec)
         new_json = event.json
         new_json['time']['sec'] = new_timestamp.sec
         new_json['time']['usec'] = new_timestamp.usec
         new_raw = json.dumps(new_json) + '\n'
         
-        event = Event(raw=new_raw, json=new_json, timestamp=new_timestamp)
-        yield event
+        fixed_events.append( Event(raw=new_raw, json=new_json, timestamp=new_timestamp) )
+    fixed_events.reverse()
+    return fixed_events
 
 def fix_boot_timestamps(iterable):
     events = []
     
     prev_event = None
-    cnt = 0
     while True:
         event = next(iterable)
         if is_before(event.timestamp, EARLIEST_TIME):
-            cnt += 1
-            events.append(event)
+            if prev_event != None and (event.timestamp.sec - prev_event.timestamp.sec > MAX_SKIP_INTERVAL):
+                print("Time jumped: %d"%(event.timestamp.sec - prev_event.timestamp.sec), file=sys.stderr)
+                delta_sec = event.timestamp.sec - prev_event.timestamp.sec
+                delta_usec = event.timestamp.usec - prev_event.timestamp.usec - BOOT_OFFSET_USEC
+            else:
+                delta_sec = None
+                delta_usec = None
+
+            events.append((event, delta_sec, delta_usec))
             prev_event = event
         else:
             break
 
     if prev_event != None:
-        print("info: corrected timestamp on %d early boot events"%cnt, file=sys.stderr)
+        print("Time jumped: %d"%(event.timestamp.sec - prev_event.timestamp.sec), file=sys.stderr)
+        print("info: corrected timestamp on %d early boot events"%len(events), file=sys.stderr)
         delta_sec = event.timestamp.sec - prev_event.timestamp.sec
         delta_usec = event.timestamp.usec - prev_event.timestamp.usec - BOOT_OFFSET_USEC 
     else:
