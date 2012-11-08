@@ -129,7 +129,7 @@ def main():
     parser.add_argument('-a', '--analyze', dest='analyze', action='store_true')
     parser.add_argument('-o', '--outpath', dest='outpath')
     parser.add_argument('-p', '--plot', dest='plot', action='store_true')
-    parser.add_argument('paths', nargs='+')
+    parser.add_argument('paths', nargs='*')
 
     args = parser.parse_args()
     if args.analyze:
@@ -138,6 +138,8 @@ def main():
         analyze(sys.stdin, args.outpath, statistics)
     
     if args.plot:
+        if len(args.paths) == 0:
+            exit("Error: must specify one or more input paths")
         plot(args.paths, statistics)
 
 if __name__ == "__main__":
