@@ -17,22 +17,20 @@ class AwakeDurations(object):
     def __init__(self):
         self.durations = []
         self.awaken_time = None
-        self.started = False
+        self.synced = False
 
     def process_event(self, event):
-        if not self.started:
-            self.started = True
-            self.awaken_time = event.timestamp
-
-        elif event.event == 'RESUME':
+        if event.event == 'RESUME':
             assert self.awaken_time == None
             self.awaken_time = event.timestamp
+            self.synced = True
 
         elif event.event == 'SUSPEND':
-            assert self.awaken_time != None
-            duration = event.timestamp - self.awaken_time
-            self.durations.append(duration)
-            self.awaken_time = None
+            if self.synced:
+                assert self.awaken_time != None
+                duration = event.timestamp - self.awaken_time
+                self.durations.append(duration)
+                self.awaken_time = None
 
     def persist(self, path):
         dname = os.path.join(path, self.subpath)
@@ -64,17 +62,20 @@ class SleepDurations(object):
     def __init__(self):
         self.durations = []
         self.sleep_time = None
-    
+        self.synced = False
+
     def process_event(self, event):
         if event.event == 'SUSPEND':
             assert self.sleep_time == None
+            self.synced = True
             self.sleep_time = event.timestamp
 
         elif event.event == 'RESUME':
-            assert self.sleep_time != None
-            duration = event.timestamp - self.sleep_time
-            self.durations.append(duration)
-            self.sleep_time = None
+            if self.synced:
+                assert self.sleep_time != None
+                duration = event.timestamp - self.sleep_time
+                self.durations.append(duration)
+                self.sleep_time = None
 
     def persist(self, path):
         dname = os.path.join(path, self.subpath)
