@@ -304,3 +304,15 @@ def decode_event(encoded):
         "MSG_POLL_DONE" : UserspaceTagEvent
         }[data['event']](data)
     
+from collections import namedtuple
+EventT = namedtuple('EventT', ['event', 'timestamp', 'cpu', 'pid', 'irq', 'data'])
+
+def decode_event_tuple(encoded):
+    data = json.loads(encoded)
+    timestamp = data['time']
+    return EventT(data['event'],
+                  timestamp['sec'] * 1000000 + timestamp['usec'],
+                  data['cpu'],
+                  data['pid'],
+                  data['irq'],
+                  data['data'])
