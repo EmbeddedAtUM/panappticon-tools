@@ -21,16 +21,20 @@ class AwakeDurations(object):
 
     def process_event(self, event):
         if event.event == 'RESUME':
-            assert self.awaken_time == None
-            self.awaken_time = event.timestamp
-            self.synced = True
+            if (self.awaken_time != None):
+                print("Warning: RESUME without preceding SUSPEND. Ignoring RESUME.", file=sys.stderr)
+            else:
+                self.awaken_time = event.timestamp
+                self.synced = True
 
         elif event.event == 'SUSPEND':
             if self.synced:
-                assert self.awaken_time != None
-                duration = event.timestamp - self.awaken_time
-                self.durations.append(duration)
-                self.awaken_time = None
+                if (self.awaken_time == None):
+                    print("Warning: SUSPEND without preceding RESUME. Ignoring SUSPEND.", file=sys.stderr)
+                else:
+                    duration = event.timestamp - self.awaken_time
+                    self.durations.append(duration)
+                    self.awaken_time = None
 
     def persist(self, path):
         dname = os.path.join(path, self.subpath)
@@ -66,16 +70,20 @@ class SleepDurations(object):
 
     def process_event(self, event):
         if event.event == 'SUSPEND':
-            assert self.sleep_time == None
-            self.synced = True
-            self.sleep_time = event.timestamp
+            if (self.sleep_time != None):
+                print("Warning: SUSPEND without preceding RESUME. Ignoring SUSPEND.", file=sys.stderr)
+            else:
+                self.synced = True
+                self.sleep_time = event.timestamp
 
         elif event.event == 'RESUME':
             if self.synced:
-                assert self.sleep_time != None
-                duration = event.timestamp - self.sleep_time
-                self.durations.append(duration)
-                self.sleep_time = None
+                if (self.sleep_time == None):
+                    print("Warning: RSEUME without preceding SUSPEND. Ignoring RESUME.", file=sys.stderr)
+                else:
+                    duration = event.timestamp - self.sleep_time
+                    self.durations.append(duration)
+                    self.sleep_time = None
 
     def persist(self, path):
         dname = os.path.join(path, self.subpath)
