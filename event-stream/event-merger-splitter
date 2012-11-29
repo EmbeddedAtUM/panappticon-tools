@@ -2,11 +2,13 @@
 
 from __future__ import print_function
 
-import datetime
+import datetime as dt
+import gzip
 import heapq
 import os
 import signal
 import subprocess
+import sys
 
 import functools as ft
 import itertools as it
@@ -18,6 +20,9 @@ except:
 
 VERBOSE = False
 
+#############################################
+#  Merging 
+#############################################
 def open_gzip(fname, silent=False):
     if silent:
         preexec_fn = lambda: signal.signal(signal.SIGPIPE, signal.SIG_DFL) # Silence broken pipe warnings
@@ -72,7 +77,8 @@ class ComparableEvent(object):
     def __init__(self, encoded):
         self.json = encoded
         data = json.loads(encoded)
-        self.timestamp = data['time']['sec'] * 1000000 + data['time']['usec'] 
+        self.seconds = data['time']['sec']
+        self.timestamp = self.seconds * 1000000 + data['time']['usec'] 
 
     def __eq__(self, other):
         return self.timestamp == other.timestamp
@@ -80,22 +86,59 @@ class ComparableEvent(object):
     def __lt__(self, other):
         return self.timestamp < other.timestamp
 
-
-def main(istreams, ostream):
+def merge(istreams):
     cmp_streams = [it.imap(ComparableEvent, stream) for stream in istreams]
     sorted_stream = heapq.merge(*cmp_streams)
-    for event in sorted_stream:
-        ostream.write(event.json)
+    return sorted_stream
+
+#############################################
+#  Splitting 
+#############################################
+def parse_date(seconds):
+    return dt.datetime.utcfromtimestamp(int(seconds))
+
+def filename_from_date(path, date):
+    TEMPLATE = '%s.json.gz'
+    return os.path.join(path, TEMPLATE%(date.strftime('%Y-%m-%d')))
+
+FILENAME = ''
+FILE = None
+
+def get_file(path, date):
+    global FILENAME
+    global FILE
+    key = filename_from_date(path, date)
+    if FILENAME != key:
+        if (FILE != None):
+            FILE.close()
+            if VERBOSE:
+                print("Closed file %s"%FILENAME, file=sys.stderr)
+        FILENAME = key
+        FILE = gzip.open(key, 'ab')
+        if VERBOSE:
+            print("Opened file %s"%key, file=sys.stderr)
+    return FILE
+
+def split(istream, path):
+    for event in istream:
+        date = parse_date(event.seconds)
+        get_file(path, date).write(event.json)
+
+def main(istreams, path):
+    split(merge(istreams), path)
  
 if __name__ == "__main__":
-    import sys
+    import argparse
 
-    if '-v' in sys.argv:
+    parser = argparse.ArgumentParser(description="Merge and split kernel event buffers.")
+    parser.add_argument('-v', '--verbose', action='store_true', default=False, help='print messages about progress to stderr')
+    parser.add_argument('path', type=str, help='path in which to store the merged and split logs')
+    args = parser.parse_args()
+
+    if args.verbose:
         VERBOSE = True
 
     fstreams = [LazyFileIter(f) for f in sys.stdin]
     istreams = [it.ifilter(lambda l: l != '\n', s) for s in fstreams]
-    
-    ostream = sys.stdout
 
-    main(istreams, ostream)
+    main(istreams, args.path)
