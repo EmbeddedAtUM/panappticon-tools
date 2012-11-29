@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+
+import subprocess
+import signal
+import sys
+
+import itertools as it
+
+def preexec_fn(silent):
+    if  silent:
+        return lambda: signal.signal(signal.SIGPIPE, signal.SIG_DFL) # Silence broken pipe warnings
+    else:
+        return None
+
+def open_gzip(fname, silent=False):
+    print("Opening " + fname, file=sys.stderr)
+    p = subprocess.Popen(["zcat", "-q", fname], stdout=subprocess.PIPE, preexec_fn=preexec_fn(silent))
+    return p.stdout
+
+def open_file(fname, silent=False):
+    fname = fname.strip()
+    if fname.endswith(".gz"):
+        return open_gzip(fname, silent)
+    else:
+        return open(fname, 'r')
+
+def egrep(stdin, args, silent=False):
+    a = ["egrep"]
+    a.extend(args)
+    p = subprocess.Popen(a, stdin=stdin, stdout=subprocess.PIPE, preexec_fn=preexec_fn(silent))
+    return p.stdout
+
+def extract(istream, ostream):
+    ostream.writelines(egrep(istream, ["FORK|THREAD_NAME"], silent=False))
+
+def main(filenames, ostream):
+    for fname in filenames:
+        with open_file(fname, silent=False) as f:
+            extract(f, ostream)
+
+if __name__ == "__main__":
+    filenames = sys.stdin
+    ostream = sys.stdout
+    main(filenames, ostream)
+
