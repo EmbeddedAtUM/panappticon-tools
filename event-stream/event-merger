@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 import datetime
 import heapq
 import os
+import signal
 import subprocess
 
 import functools as ft
@@ -13,13 +16,63 @@ try:
 except:
     import json
 
+VERBOSE = False
+
+def open_gzip(fname, silent=False):
+    if silent:
+        preexec_fn = lambda: signal.signal(signal.SIGPIPE, signal.SIG_DFL) # Silence broken pipe warnings
+    else:
+        preexec_fn = None
+    p = subprocess.Popen(["zcat", "-q", fname], stdout = subprocess.PIPE, preexec_fn=preexec_fn)
+    return p.stdout
+
+def open_file(fname, silent=False):
+    if fname.endswith(".gz"):
+        return open_gzip(fname, silent)
+    else:
+        return open(fname, 'r')
+
+class LazyFileIter(object):
+    '''Caches the first line of the file on object creation and does
+    not re-open the file until the second line is requested. 
+    '''
+
+    def __init__(self, filename):
+        self._filename = filename.strip()
+        self._readfirst = False
+        self._file = None
+
+        with open_file(self._filename, silent=True) as f:
+            self._firstline = f.readline()
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self._readfirst:
+            if self._file == None:
+                self._file = open_file(self._filename)
+                self._file.next() #skip already-returned first line
+                if VERBOSE:
+                    print("Opened file %s"%self._filename, file=sys.stderr)
+            try:
+                return self._file.next()
+            except StopIteration as e:
+                self._file.close()
+                if VERBOSE:
+                    print("Closed file %s"%self._filename, file=sys.stderr)
+                raise e
+        else:
+            self._readfirst = True
+            return self._firstline
+
 @ft.total_ordering # Requires Python 2.7+/3.2+
 class ComparableEvent(object):
     
     def __init__(self, encoded):
         self.json = encoded
         data = json.loads(encoded)
-        self.timestamp = datetime.datetime.fromtimestamp(data['time']['sec']).replace(microsecond=data['time']['usec'])
+        self.timestamp = data['time']['sec'] * 1000000 + data['time']['usec'] 
 
     def __eq__(self, other):
         return self.timestamp == other.timestamp
@@ -27,26 +80,22 @@ class ComparableEvent(object):
     def __lt__(self, other):
         return self.timestamp < other.timestamp
 
-def open_gzip(fname):
-    p = subprocess.Popen(["zcat", fname], stdout = subprocess.PIPE)
-    return p.stdout
-
-def open_file(fname):
-    if fname.endswith(".gz"):
-        return open_gzip(fname)
-    else:
-        return open(fname, 'r')
 
 def main(istreams, ostream):
     cmp_streams = [it.imap(ComparableEvent, stream) for stream in istreams]
     sorted_stream = heapq.merge(*cmp_streams)
     for event in sorted_stream:
         ostream.write(event.json)
-
+ 
 if __name__ == "__main__":
     import sys
 
-    istreams = [open_file(f) for f in sys.argv[1:]]
+    if '-v' in sys.argv:
+        VERBOSE = True
+
+    fstreams = [LazyFileIter(f) for f in sys.stdin]
+    istreams = [it.ifilter(lambda l: l != '\n', s) for s in fstreams]
+    
     ostream = sys.stdout
 
     main(istreams, ostream)
