@@ -101,13 +101,23 @@ def filename_from_date(path, date):
     TEMPLATE = '%s.json.gz'
     return os.path.join(path, TEMPLATE%(date.strftime('%Y-%m-%d')))
 
+LAST_TIMESTAMP = None
+LAST_FILENAME = None
+def filename_from_timestamp(path, seconds):
+    global LAST_TIMESTAMP
+    global LAST_FILENAME
+    if seconds != LAST_TIMESTAMP:
+        LAST_TIMESTAMP = seconds
+        LAST_FILENAME = filename_from_date(path,parse_date(seconds))
+    return LAST_FILENAME
+
 FILENAME = ''
 FILE = None
 
-def get_file(path, date):
+def get_file(path, seconds):
     global FILENAME
     global FILE
-    key = filename_from_date(path, date)
+    key = filename_from_timestamp(path, seconds)
     if FILENAME != key:
         if (FILE != None):
             FILE.close()
@@ -121,8 +131,7 @@ def get_file(path, date):
 
 def split(istream, path):
     for event in istream:
-        date = parse_date(event.seconds)
-        get_file(path, date).write(event.json)
+        get_file(path, event.seconds).write(event.json)
 
 def main(istreams, path):
     split(merge(istreams), path)
