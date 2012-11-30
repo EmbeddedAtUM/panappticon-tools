@@ -133,7 +133,7 @@ def fix_timestamps(events, delta_sec, delta_usec):
     return fixed_events
 
 def create_bootevent(sec, usec):
-    json = '''{"event":"BOOT","time":{"sec":%d,"usec":%d},"cpu":0,"pid":0,"irq":false,"data":null}'''%(sec, usec)
+    json = '''{"event":"BOOT","time":{"sec":%d,"usec":%d},"cpu":0,"pid":0,"irq":false,"data":null}\n'''%(sec, usec)
     return event(json)
 
 def fix_boot_timestamps(iterable):
