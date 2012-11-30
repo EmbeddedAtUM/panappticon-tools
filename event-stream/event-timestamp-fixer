@@ -80,6 +80,14 @@ def events(iterable):
     "map stream of json events to Event named tuples"
     return it.imap(event, iterable)
 
+def create_startdropevent(sec, usec):
+    json = '''{"event":"DROP_START","time":{"sec":%d,"usec":%d},"cpu":0,"pid":0,"irq":false,"data":null}\n'''%(sec, usec)
+    return event(json)
+
+def create_stopdropevent(sec, usec, count):
+    json = '''{"event":"DROP_STOP","time":{"sec":%d,"usec":%d},"cpu":0,"pid":0,"irq":false,"data":{"count":%d}}\n'''%(sec, usec, count)
+    return event(json)
+
 def filter_backwards(iterable):
     # Decorate each event with boolean indicating if the event time is before the the prior event
     decorated = decorate(withprev(iterable), event_is_backwards) 
@@ -95,16 +103,18 @@ def filter_backwards(iterable):
             else:
                 dropped += 1
 
+    prev_event = None
     for (event, prev), backwards in decorated:
         if (backwards):
+            yield create_startdropevent(prev_event.timestamp.sec, prev_event.timestamp.usec)
             dropped, event = drop(decorated, add_timestamp(event.timestamp, DROP_DURATION))
+            yield create_stopdropevent(event.timestamp.sec, event.timestamp.usec, dropped)
             print("info: dropped %d events after time moved backwards"%dropped, file=sys.stderr)
-            # TODO: yield event containing number of dropped events
+        prev_event = event
         yield event
 
 # Fix boot timestamps
 #
-
 def fix_timestamps(events, delta_sec, delta_usec):
     fixed_events = []
     for event, dsec, dusec in reversed(events):

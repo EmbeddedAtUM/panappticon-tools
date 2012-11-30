@@ -61,6 +61,23 @@ class MissedCountEvent(Event):
         header = super(MissedCountEvent, self).__str__()
         return "%s: %d"%(header, self.count)
 
+class DropStartEvent(Event):
+    def __init__(self, data):
+        super(DropStartEvent, self).__init__(data)
+
+    def __str__(self):
+        header = super(DropStartEvent, self).__str__()
+        return "%s"%(header)
+
+class DropStopEvent(Event):
+    def __init__(self, data):
+        super(DropStopEvent, self).__init__(data)
+        self.count = self.data['count']
+
+    def __str__(self):
+        header = super(DropStopEvent, self).__str__()
+        return "%s: %d"%(header, self.count)
+
 class HotCpuEvent(Event):
     def __init__(self, data):
         super(HotCpuEvent, self).__init__(data)
@@ -242,6 +259,8 @@ def decode_event(encoded):
         "BOOT" : Event,
         "SYNC_LOG" : SyncLogEvent,
         "MISSED_COUNT" : MissedCountEvent,
+        "DROP_START" : DropStartEvent,
+        "DROP_STOP" : DropStopEvent,
         "CPU_ONLINE" : HotCpuEvent,
         "CPU_DOWN_PREPARE" : HotCpuEvent,
         "CPU_DEAD" : HotCpuEvent,
