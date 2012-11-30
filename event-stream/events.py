@@ -239,6 +239,7 @@ class UserspaceTagEvent(UserspaceEvent):
 def decode_event(encoded):
     data = json.loads(encoded)
     return {
+        "BOOT" : Event,
         "SYNC_LOG" : SyncLogEvent,
         "MISSED_COUNT" : MissedCountEvent,
         "CPU_ONLINE" : HotCpuEvent,

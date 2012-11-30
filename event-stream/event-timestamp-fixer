@@ -122,6 +122,10 @@ def fix_timestamps(events, delta_sec, delta_usec):
     fixed_events.reverse()
     return fixed_events
 
+def create_bootevent(sec, usec):
+    json = '''{"event":"BOOT","time":{"sec":%d,"usec":%d},"cpu":0,"pid":0,"irq":false,"data":null}'''%(sec, usec)
+    return event(json)
+
 def fix_boot_timestamps(iterable):
     events = []
     
@@ -129,6 +133,11 @@ def fix_boot_timestamps(iterable):
     while True:
         event = next(iterable)
         if is_before(event.timestamp, EARLIEST_TIME):
+            if (prev_event == None and event.json['cpu'] == 0): # insert boot event
+                sec = event.timestamp.sec
+                usec = event.timestamp.usec
+                events.append((create_bootevent(sec, usec), None, None))
+
             if prev_event != None and (event.timestamp.sec - prev_event.timestamp.sec > MAX_SKIP_INTERVAL):
                 print("Time jumped: %d"%(event.timestamp.sec - prev_event.timestamp.sec), file=sys.stderr)
                 delta_sec = event.timestamp.sec - prev_event.timestamp.sec
