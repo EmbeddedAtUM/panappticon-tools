@@ -120,6 +120,23 @@ static void print_thread_name_event(FILE* stream, const struct event_hdr* header
   printf("{\"pid\":%u,\"name\":\"%s\"}", data->pid, data->comm);
 }
 
+static void decode_cpufreq_mod_timer_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct cpufreq_mod_timer_event* data) {
+  fread(&data->cpu, 1, 1, stream);
+  fread(&data->microseconds, 4, 1, stream);
+}
+
+static void print_cpufreq_mod_timer_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct cpufreq_mod_timer_event* data) {
+  printf("{\"cpu\":%u,\"microseconds\":%u}", data->cpu, data->microseconds);
+}
+
+static void decode_cpufreq_timer_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, struct cpufreq_timer_event* data) {
+  fread(&data->cpu, 1, 1, stream);
+}
+
+static void print_cpufreq_timer_event(FILE* stream, const struct event_hdr* header, const struct timeval* tv, const struct cpufreq_timer_event* data) {
+  printf("{\"cpu\":%u}", data->cpu);
+}
+
 /* ======================================================================================================== */
 
 #define DECLARE_TYPE_DATA(type_suffix) struct type_suffix##_event shared_##type_suffix##_event
@@ -136,6 +153,8 @@ static DECLARE_TYPE_DATA(thread_name);
 static DECLARE_TYPE_DATA(general_lock);
 static DECLARE_TYPE_DATA(general_notify);
 static DECLARE_TYPE_DATA(binder);
+static DECLARE_TYPE_DATA(cpufreq_mod_timer);
+static DECLARE_TYPE_DATA(cpufreq_timer);
 
 struct event_type {
   const char* const type_json;
@@ -201,7 +220,12 @@ static struct event_type EVENT_TYPES[256] = {
   INIT_TYPE(SEMAPHORE_NOTIFY, general_notify),
   INIT_TYPE(FUTEX_WAIT, general_lock),
   INIT_TYPE(FUTEX_WAKE, general_lock),
-  INIT_TYPE(FUTEX_NOTIFY, general_notify)
+  INIT_TYPE(FUTEX_NOTIFY, general_notify),
+  INIT_TYPE_SIMPLE(CPUFREQ_BOOST),
+  INIT_TYPE_SIMPLE(CPUFREQ_WAKE_UP),
+  INIT_TYPE(CPUFREQ_MOD_TIMER, cpufreq_mod_timer),
+  INIT_TYPE(CPUFREQ_DEL_TIMER, cpufreq_timer),
+  INIT_TYPE(CPUFREQ_TIMER, cpufreq_timer)
 };
 
 #define PID_MASK 0x7FFF
@@ -275,7 +299,7 @@ int main() {
       fprintf(stderr, "Unknown event type received: %u\n", header.event_type);
       exit(1);
     }
-      
+
     if (type->decoder)
       type->decoder(istream, &header, &timestamp, type->data);
 

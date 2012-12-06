@@ -30,6 +30,8 @@ def format_hertz(quantity, multiplier):
 
 class Event(object):
     def __init__(self, data):
+        self.sec = data['time']['sec']
+        self.usec = data['time']['usec']
         self.timestamp = dt.datetime.fromtimestamp(data['time']['sec']).replace(microsecond=data['time']['usec'])
         self.cpu = data['cpu']
         self.pid = data['pid']
@@ -38,7 +40,7 @@ class Event(object):
         self.data = data['data']
 
     def __str__(self):
-        return "[%s] <%s> (%7s) %16s"%(format_timestamp(self.timestamp),
+        return "[%s] <%s> (%7s) %17s"%(format_timestamp(self.timestamp),
                                      self.cpu,
                                      "I %5s"%self.pid if self.irq else self.pid,
                                      self.event.replace('_',' ').capitalize())
@@ -184,6 +186,28 @@ class ContextSwitchEvent(Event):
         header = super(ContextSwitchEvent, self).__str__()
         return "%s: %5d => %5d (%s)"%(header, self.old_pid, self.new_pid, self.state_map[self.state])
 
+class CpufreqTimerEvent(Event):
+    def __init__(self, data):
+        super(CpufreqTimerEvent, self).__init__(data)
+        self.cpu = self.data['cpu']
+    
+    def __str__(self):
+        header = super(CpufreqTimerEvent, self).__str__()
+        return "%s: cpu: %d"%(header, self.cpu)
+    
+class CpufreqModTimerEvent(Event):
+    def __init__(self, data):
+        super(CpufreqModTimerEvent, self).__init__(data)
+        self.cpu = self.data['cpu']
+        self.microseconds = self.data['microseconds']
+
+    def expiry(self):
+        return self.timestamp + dt.timedelta(microseconds=self.microseconds)
+
+    def __str__(self):
+        header = super(CpufreqModTimerEvent, self).__str__()
+        return "%s: cpu: %d @%s"%(header, self.cpu, self.expiry().strftime("%S.%f"))
+    
 # Userspace Events
 class Event(object):
     def __init__(self, data):
@@ -253,6 +277,7 @@ class UserspaceTagEvent(UserspaceEvent):
         header = super(UserspaceTagEvent, self).__str__()
         return "%s"%(header)
 
+import sys
 def decode_event(encoded):
     data = json.loads(encoded)
     return {
@@ -306,6 +331,11 @@ def decode_event(encoded):
         "FUTEX_WAIT" : GeneralLockEvent,
         "FUTEX_WAKE" : GeneralLockEvent,
         "FUTEX_NOTIFY" : GeneralNotifyEvent,
+        "CPUFREQ_BOOST" : Event,
+        "CPUFREQ_WAKE_UP" : Event,
+        "CPUFREQ_MOD_TIMER" : CpufreqModTimerEvent,
+        "CPUFREQ_DEL_TIMER" : CpufreqTimerEvent,
+        "CPUFREQ_TIMER" : CpufreqTimerEvent,
         "MSG_ENQUEUE" : MessageQueueEvent,
         "MSG_DEQUEUE" : MessageQueueEvent,
         "MSG_ENQUEUE_DELAY" : MessageQueueDelayEvent,
