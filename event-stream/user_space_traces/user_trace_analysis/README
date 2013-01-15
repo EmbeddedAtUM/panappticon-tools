@@ -1,0 +1,7 @@
+To compute the dependency between events and construct the transaction graph, run:
+  cat <sorted event stream that contains both kernel log and user log> | python ComputeDependencies.py <result_dir>
+
+Each connected subgraph would be stored as a pickle file in the result_dir. To read it or check out the file, use
+DebugUtil.py or PrintTransaction.py.
+
+To do resource accounting, use ResourceCounting.py.
